@@ -1,14 +1,14 @@
-function [GD, MD, DISP] = nk_GridSearchHelper(GD, MD, DISP, i, nclass, ngroups, CV1PerfData, CV2PerfData, models)
+function [GD, MD, DISP] = nk_GridSearchHelper(GD, MD, DISP, idx_selected, nclass, ngroups, CV1PerfData, CV2PerfData, models)
 
 global VERBOSE MULTI CV BATCH SVM MODEFL W2AVAIL RAND MULTILABEL RFE SAV DEBUG
 
 %%%%%% TRANSFER RESULTS TO GD :
 
 if (SAV.savemodel && (exist('models','var') && ~isempty(models))) || (~isempty(DEBUG) && DEBUG.optmodel)
-    MD{i} = models;
+    MD{idx_selected} = models;
 end
 
-pos1 = []; pos2 = []; pos3 = [];
+pos2 = []; pos3 = [];
 hasComplexity = false;
 if any(contains({'LIBSVM','MikRVM', 'MKLRVM', 'MVTRVR'}, SVM.prog))
     hasComplexity = true;
@@ -54,22 +54,22 @@ switch Metric
 
     case 1 % Mean of ensembles (Targets)
 
-        GD.TR(i,:,curlabel) = Perf.MeanCVHTperf;
-        GD.sTR(i,:,curlabel) = Perf.SDCVHTperf;
+        GD.TR(idx_selected,:,curlabel) = Perf.MeanCVHTperf;
+        GD.sTR(idx_selected,:,curlabel) = Perf.SDCVHTperf;
 
     case 2 % Mean of ensembles (Decision Values)
 
-        GD.TR(i,:,curlabel) = Perf.MeanCVHDperf;
-        GD.sTR(i,:,curlabel) = Perf.SDCVHDperf;
+        GD.TR(idx_selected,:,curlabel) = Perf.MeanCVHDperf;
+        GD.sTR(idx_selected,:,curlabel) = Perf.SDCVHDperf;
 
 end
 
 if (Param.flag && Param.SubSpaceFlag ) && (isfield(Param,'EnsembleStrategy') && Param.EnsembleStrategy.type ~= 9 )
 
-    GD.M_DivT(i,:,curlabel)    = Perf.Ens_MeanTrDiv;
-    GD.SD_DivT(i,:,curlabel)   = Perf.Ens_SDTrDiv;
-    GD.M_DivV(i,:,curlabel)    = Perf.Ens_MeanCVDiv;
-    GD.SD_DivV(i,:,curlabel)   = Perf.Ens_SDCVDiv;
+    GD.M_DivT(idx_selected,:,curlabel)    = Perf.Ens_MeanTrDiv;
+    GD.SD_DivT(idx_selected,:,curlabel)   = Perf.Ens_SDTrDiv;
+    GD.M_DivV(idx_selected,:,curlabel)    = Perf.Ens_MeanCVDiv;
+    GD.SD_DivV(idx_selected,:,curlabel)   = Perf.Ens_SDCVDiv;
     flg = true;     
 else
     flg = false;
@@ -78,31 +78,31 @@ end
 % multi-group:
 if MULTI.flag
 
-   GD.MultiCV1TrPred{i,curlabel}       = Perf.MultiTrPredictions;
-   GD.MultiCV1CVPred{i,curlabel}       = Perf.MultiCVPredictions;
-   GD.MultiTR(i,curlabel)              = Perf.MeanMultiCVPerf; 
+   GD.MultiCV1TrPred{idx_selected,curlabel}       = Perf.MultiTrPredictions;
+   GD.MultiCV1CVPred{idx_selected,curlabel}       = Perf.MultiCVPredictions;
+   GD.MultiTR(idx_selected,curlabel)              = Perf.MeanMultiCVPerf; 
     switch CV2Param.type 
         case 1 % mean of CV1 ensemble
-            GD.MultiTS(i,curlabel) = mean(CV2Perf.MultiCV1Performance(:));
+            GD.MultiTS(idx_selected,curlabel) = mean(CV2Perf.MultiCV1Performance(:));
         case 2 % Ensemble of ensembles
-            GD.MultiTS(i,curlabel) = CV2Perf.MultiCV2Performance;
+            GD.MultiTS(idx_selected,curlabel) = CV2Perf.MultiCV2Performance;
     end
-    GD.MultiCV2Div(i,curlabel) = CV2Perf.MultiCV2Diversity_Targets;
-    GD.MultiCV2DivDec(i,:,curlabel) = CV2Perf.MultiCV2Diversity_DecValues;
-    GD.MultiCV2Pred{i,curlabel}   = CV2Perf.MultiCV2Predictions;
-    GD.MultiCV2Prob{i,curlabel}   = CV2Perf.MultiCV2Probabilities;
-    GD.MultiCV1Pred{i,curlabel}   = nk_cellcat(CV2Perf.MultiCV1Predictions,[],2);
+    GD.MultiCV2Div(idx_selected,curlabel) = CV2Perf.MultiCV2Diversity_Targets;
+    GD.MultiCV2DivDec(idx_selected,:,curlabel) = CV2Perf.MultiCV2Diversity_DecValues;
+    GD.MultiCV2Pred{idx_selected,curlabel}   = CV2Perf.MultiCV2Predictions;
+    GD.MultiCV2Prob{idx_selected,curlabel}   = CV2Perf.MultiCV2Probabilities;
+    GD.MultiCV1Pred{idx_selected,curlabel}   = nk_cellcat(CV2Perf.MultiCV1Predictions,[],2);
     for g=1:ngroups
         F = repmat({g}, size(CV2Perf.MultiCV1Probabilities));
-        GD.MultiCV1Prob{i,g,curlabel} = nk_cellcat(CV2Perf.MultiCV1Probabilities, [], 2, F);
+        GD.MultiCV1Prob{idx_selected,g,curlabel} = nk_cellcat(CV2Perf.MultiCV1Probabilities, [], 2, F);
     end
-    GD.MultiERR(i,curlabel)    = GD.MultiTR(i) - GD.MultiTS(i);
+    GD.MultiERR(idx_selected,curlabel)    = GD.MultiTR(idx_selected) - GD.MultiTS(idx_selected);
 
    if flg
-        GD.MultiM_DivT(i,curlabel)     = Perf.Ens_MeanMultiTrDiv;
-        GD.MultiSD_DivT(i,curlabel)    = Perf.Ens_SDMultiTrDiv;
-        GD.MultiM_DivV(i,curlabel)     = Perf.Ens_MeanMultiCVDiv;
-        GD.MultiSD_DivV(i,curlabel)    = Perf.Ens_SDMultiCVDiv;
+        GD.MultiM_DivT(idx_selected,curlabel)     = Perf.Ens_MeanMultiTrDiv;
+        GD.MultiSD_DivT(idx_selected,curlabel)    = Perf.Ens_SDMultiTrDiv;
+        GD.MultiM_DivV(idx_selected,curlabel)     = Perf.Ens_MeanMultiCVDiv;
+        GD.MultiSD_DivV(idx_selected,curlabel)    = Perf.Ens_SDMultiCVDiv;
    end
 end
 
@@ -111,70 +111,70 @@ end
 switch CV2Param.type
     case 1
         % Mean of CV1 ensemble
-        GD.TS(i,:,curlabel) = CV2Perf.BinCV1Performance_Mean;
+        GD.TS(idx_selected,:,curlabel) = CV2Perf.BinCV1Performance_Mean;
     case 2
         % Ensemble of ensemble decision
         switch Metric                                     
             case 1
-                GD.TS(i,:,curlabel) = CV2Perf.binCV2Performance_Targets;
+                GD.TS(idx_selected,:,curlabel) = CV2Perf.binCV2Performance_Targets;
             case 2
-                GD.TS(i,:,curlabel) = CV2Perf.binCV2Performance_DecValues;
+                GD.TS(idx_selected,:,curlabel) = CV2Perf.binCV2Performance_DecValues;
         end
 end
 
 % Decision values / Probabilities on CV2 test data
-GD.DS{i,curlabel}          = CV2Perf.binCV1Predictions;
-GD.BinPred{i,curlabel}     = CV2Perf.binCV2Predictions_DecValues;
-GD.CV2Div(i,:,curlabel)    = CV2Perf.binCV2Diversity_Targets;
-GD.CV2DivDec(i,:,curlabel) = CV2Perf.binCV2Diversity_DecValues;
+GD.DS{idx_selected,curlabel}          = CV2Perf.binCV1Predictions;
+GD.BinPred{idx_selected,curlabel}     = CV2Perf.binCV2Predictions_DecValues;
+GD.CV2Div(idx_selected,:,curlabel)    = CV2Perf.binCV2Diversity_Targets;
+GD.CV2DivDec(idx_selected,:,curlabel) = CV2Perf.binCV2Diversity_DecValues;
 
 % Model params
-GD.FEAT{i,curlabel}        = Perf.SubSpaces;
+GD.FEAT{idx_selected,curlabel}        = Perf.SubSpaces;
 if flg
-    GD.Weights{i,curlabel} = Perf.Weights;
+    GD.Weights{idx_selected,curlabel} = Perf.Weights;
 end
-GD.DT{i,curlabel}          = Perf.TrDecisionValues;
-GD.DV{i,curlabel}          = Perf.CVDecisionValues;
-GD.C(i,:,curlabel)         = Perf.ModelComplexity.Complex;
+GD.DT{idx_selected,curlabel}          = Perf.TrDecisionValues;
+GD.DV{idx_selected,curlabel}          = Perf.CVDecisionValues;
+GD.C(idx_selected,:,curlabel)         = Perf.ModelComplexity.Complex;
 
 if W2AVAIL
-    GD.W2{i,curlabel}          = Perf.w2;
-    GD.Md{i,curlabel}          = Perf.Md;
-    GD.Mm{i,curlabel}          = Perf.Mm;
-    GD.mMd(i,:,curlabel)       = mean(cellcat(GD.Md{i,curlabel}));
+    GD.W2{idx_selected,curlabel}          = Perf.w2;
+    GD.Md{idx_selected,curlabel}          = Perf.Md;
+    GD.Mm{idx_selected,curlabel}          = Perf.Mm;
+    GD.mMd(idx_selected,:,curlabel)       = mean(cellcat(GD.Md{idx_selected,curlabel}));
 end
 
 % Compute generalization error for current binary comparison
-GD.ERR(i,:,curlabel) = GD.TR(i,:,curlabel) - GD.TS(i,:,curlabel);
+GD.ERR(idx_selected,:,curlabel) = GD.TR(idx_selected,:,curlabel) - GD.TS(idx_selected,:,curlabel);
 
 switch SVM.prog
     case 'SEQOPT'
         for curclass = 1:nclass
-           GD.mSEQI{i, curclass, curlabel}      = Perf.MeanCritGain(curclass,:);
-           GD.sdSEQI{i, curclass, curlabel}     = Perf.SDCritGain(curclass,:);
-           GD.mSEQE{i, curclass, curlabel}      = Perf.MeanExamFreq(curclass,:);  
-           GD.sdSEQE{i, curclass, curlabel}     = Perf.SDExamFreq(curclass,:); 
-           GD.mSEQAbsThrU{i, curclass, curlabel} = Perf.MeanAbsThreshU(curclass,:);
-           GD.sdSEQAbsThrU{i, curclass, curlabel} = Perf.SDAbsThreshU(curclass,:);
-           GD.mSEQAbsThrL{i, curclass, curlabel} = Perf.MeanAbsThreshL(curclass,:);
-           GD.sdSEQAbsThrL{i, curclass, curlabel} = Perf.SDAbsThreshL(curclass,:);
-           GD.mSEQPercThrU{i, curclass, curlabel} = Perf.MeanPercThreshU(curclass,:);
-           GD.sdSEQPercThrU{i, curclass, curlabel} = Perf.SDPercThreshU(curclass,:);
-           GD.mSEQPercThrL{i, curclass, curlabel} = Perf.MeanPercThreshL(curclass,:);
-           GD.sdSEQPercThrL{i, curclass, curlabel} = Perf.SDPercThreshL(curclass,:);
-           GD.CasePropagations{i, curclass, curlabel} = nk_cellcat(CV2Perf.binCV1CasePropagations(:,:,curclass),[],2);
-           GD.SeqPerfIncreases{i, curclass, curlabel} = nk_cellcat(CV2Perf.binCV1PerformanceIncreases(:,:,curclass),[],1);
-           GD.DecValTraj{i,curclass,curlabel} = cat(3,CV2Perf.binCV1DecValTraj{:,:,curclass});
+           GD.mSEQI{idx_selected, curclass, curlabel}      = Perf.MeanCritGain(curclass,:);
+           GD.sdSEQI{idx_selected, curclass, curlabel}     = Perf.SDCritGain(curclass,:);
+           GD.mSEQE{idx_selected, curclass, curlabel}      = Perf.MeanExamFreq(curclass,:);  
+           GD.sdSEQE{idx_selected, curclass, curlabel}     = Perf.SDExamFreq(curclass,:); 
+           GD.mSEQAbsThrU{idx_selected, curclass, curlabel} = Perf.MeanAbsThreshU(curclass,:);
+           GD.sdSEQAbsThrU{idx_selected, curclass, curlabel} = Perf.SDAbsThreshU(curclass,:);
+           GD.mSEQAbsThrL{idx_selected, curclass, curlabel} = Perf.MeanAbsThreshL(curclass,:);
+           GD.sdSEQAbsThrL{idx_selected, curclass, curlabel} = Perf.SDAbsThreshL(curclass,:);
+           GD.mSEQPercThrU{idx_selected, curclass, curlabel} = Perf.MeanPercThreshU(curclass,:);
+           GD.sdSEQPercThrU{idx_selected, curclass, curlabel} = Perf.SDPercThreshU(curclass,:);
+           GD.mSEQPercThrL{idx_selected, curclass, curlabel} = Perf.MeanPercThreshL(curclass,:);
+           GD.sdSEQPercThrL{idx_selected, curclass, curlabel} = Perf.SDPercThreshL(curclass,:);
+           GD.CasePropagations{idx_selected, curclass, curlabel} = nk_cellcat(CV2Perf.binCV1CasePropagations(:,:,curclass),[],2);
+           GD.SeqPerfIncreases{idx_selected, curclass, curlabel} = nk_cellcat(CV2Perf.binCV1PerformanceIncreases(:,:,curclass),[],1);
+           GD.DecValTraj{idx_selected,curclass,curlabel} = cat(3,CV2Perf.binCV1DecValTraj{:,:,curclass});
         end
     case 'WBLCOX'
         for curclass=1:nclass
-           GD.mCutOffPerc(i, curclass, curlabel) = Perf.MeanThreshPerc(curclass,:);
-           GD.sdCutOffPerc(i, curclass, curlabel) = Perf.SDThreshPerc(curclass,:);
-           GD.mCutOffProb(i, curclass, curlabel) = Perf.MeanThreshProb(curclass,:);
-           GD.sdCutOffProb(i, curclass, curlabel) = Perf.SDThreshProb(curclass,:);
-           GD.CV1predictedtimes{i,curlabel} = Perf.PredictedTimes(:,:,curclass);
-           GD.CV2predictedtimes{i,curlabel} = CV2Perf.binCV1times(:,:,curclass);
-           GD.CV2Cutoffs{i,curlabel} = CV2Perf.binCV1probthresh(:,:,curclass);
+           GD.mCutOffPerc(idx_selected, curclass, curlabel) = Perf.MeanThreshPerc(curclass,:);
+           GD.sdCutOffPerc(idx_selected, curclass, curlabel) = Perf.SDThreshPerc(curclass,:);
+           GD.mCutOffProb(idx_selected, curclass, curlabel) = Perf.MeanThreshProb(curclass,:);
+           GD.sdCutOffProb(idx_selected, curclass, curlabel) = Perf.SDThreshProb(curclass,:);
+           GD.CV1predictedtimes{idx_selected,curlabel} = Perf.PredictedTimes(:,:,curclass);
+           GD.CV2predictedtimes{idx_selected,curlabel} = CV2Perf.binCV1times(:,:,curclass);
+           GD.CV2Cutoffs{idx_selected,curlabel} = CV2Perf.binCV1probthresh(:,:,curclass);
         end            
 end
 
@@ -260,7 +260,7 @@ if ~BATCH
     xaxlb = { sprintf('Mean Tr%s',ex), sprintf('Mean CV_{1}%s',ex), sprintf('Mean CV_{2}%s',ex), sprintf('Ensemble CV_{2}%s%s', LCOstr, ex)};
     
     % Complexity
-    meanc       = GD.C(i,:);
+    meanc       = GD.C(idx_selected,:);
     stdc        = zeros(size(meanc));
     if DISP.nclass > 1
         meanc=[meanc;zeros(1,DISP.nclass)];
@@ -330,8 +330,8 @@ if ~BATCH
             DISP.m_ax{1}.position = posm1;
             DISP.m_ax{1}.lg = [];
             if flg
-                DISP.m_ax{2}.val_y  = [GD.MultiM_DivT(i)         GD.MultiM_DivV(i)         GD.MultiCV2Div(i)];
-                DISP.m_ax{2}.std_y  = [GD.MultiSD_DivT(i)        GD.MultiSD_DivV(i)        0]; 
+                DISP.m_ax{2}.val_y  = [GD.MultiM_DivT(idx_selected)         GD.MultiM_DivV(idx_selected)         GD.MultiCV2Div(idx_selected)];
+                DISP.m_ax{2}.std_y  = [GD.MultiSD_DivT(idx_selected)        GD.MultiSD_DivV(idx_selected)        0]; 
                 DISP.m_ax{2}.label  = {'Tr Div','CV1 Div', 'CV2 Div'};
                 DISP.m_ax{2}.ylm    = [0 1];
                 DISP.m_ax{2}.ylb    = 'Entropy'; 
@@ -355,20 +355,20 @@ if VERBOSE && ~MULTILABEL.flag
             case 'classification'
                 if RAND.Decompose ~=9
                      fprintf('\n%s: CV1 = %1.2f, CV2 = %1.2f, Complexity = %1.2f', CV.class{1,1}{curclass}.groupdesc, ...
-                         GD.TR(i,curclass,curlabel), GD.TS(i,curclass,curlabel), GD.C(i,curclass,curlabel));
+                         GD.TR(idx_selected,curclass,curlabel), GD.TS(idx_selected,curclass,curlabel), GD.C(idx_selected,curclass,curlabel));
                 else
                      fprintf('\nMulti-group: CV1 = %1.2f, CV2 = %1.2f, Complexity = %1.2f', ...
-                     GD.TR(i,curclass,curlabel), GD.TS(i,curclass,curlabel), GD.C(i,curclass,curlabel));
+                     GD.TR(idx_selected,curclass,curlabel), GD.TS(idx_selected,curclass,curlabel), GD.C(idx_selected,curclass,curlabel));
                 end
             case 'regression'
                  fprintf('\nRegression: CV1 = %1.2f, CV2 = %1.2f, Complexity = %1.2f', ...
-                     GD.TR(i,curclass,curlabel), GD.TS(i,curclass,curlabel), GD.C(i,curclass,curlabel));
+                     GD.TR(idx_selected,curclass,curlabel), GD.TS(idx_selected,curclass,curlabel), GD.C(idx_selected,curclass,curlabel));
         end
     end
 
     if MULTI.flag
         fprintf('\nMulti-Group: CV1 = %1.2f, CV2 = %1.2f, Complexity = %1.2f', ...
-            GD.MultiTR(i), GD.MultiTS(i), mean(GD.C(i,:)));
+            GD.MultiTR(idx_selected), GD.MultiTS(idx_selected), mean(GD.C(idx_selected,:)));
     end
 end
 

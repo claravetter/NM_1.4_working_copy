@@ -299,12 +299,13 @@ for n = 1:nM
         % CORRELATION ANALYSIS
         %-----------------------------------------------------------
         if ~decompfl(n)
-            tY = zeros(size(Y,1), numel(nmP)); 
+            nmPx = Fu(fVI);
+            tY = zeros(size(Y,1), numel(nmPx)); 
             if nM > 1
                 % VI references the respective modality n.
-                tY(:,nmP) = Y(:, VI(Fu) == n); 
+                tY(:,nmPx ) = Y(:, VI(Fu) == n); 
             else
-                tY(:,nmP) = Y;
+                tY(:,nmPx ) = Y;
             end
             IN.zerooutflag = 1;
             tY = nk_PerfZeroOut(tY, IN);

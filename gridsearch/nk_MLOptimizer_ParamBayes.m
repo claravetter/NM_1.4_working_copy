@@ -274,6 +274,7 @@ for curlabel = 1:nl
         end
         mapY_next = nk_MLOptimizer_ExtractDimMat(mapY, next_preproc_index, next_cPs);
         FilterSubsets_next = nk_CreateSubSets(mapY_next);
+
         if ~idxPs(next_idx)
             [CV1perf_next, CV2perf_next, models_next] = nk_CVPermFold(mapY_next, nclass, ngroups, next_cPs, FilterSubsets_next, batchflag);
             pltperc = iter*100/max_iter_bayes;
@@ -281,6 +282,8 @@ for curlabel = 1:nl
             DISP.s = sprintf('%s | %s%s\nCV2 [ %g, %g ] => %4g/%4g optimization iterations => %1.1f%% [Bayesian optimization]', ...
                     elaps, labelstr, algostr, f, d , iter, max_iter_bayes, pltperc);
             [GD, MD, DISP] = nk_GridSearchHelper(GD, MD, DISP, next_idx, nclass, ngroups, CV1perf_next, CV2perf_next, models_next);
+            if isfield(CV1perf,'detrend'), GD.Detrend{next_idx} = CV1perf.detrend; end
+            GD = nk_GenVI(mapY_next, GD, CV, f, d, nclass, next_idx, curlabel);
             idxPs(next_idx) = true;
         end
         cost_next = GD.TR(next_idx);
@@ -292,8 +295,6 @@ for curlabel = 1:nl
             best_cost = cost_next;
             best_index = next_idx;
             best_cPs = next_cPs;
-            best_mapYi = mapY_next;
-            best_FilterSubsets = FilterSubsets_next;
             no_improve_count = 0;  % reset counter on improvement
         else
             no_improve_count = no_improve_count + 1;
@@ -319,26 +320,7 @@ for curlabel = 1:nl
             fprintf('\n%sBayes Iteration %g/%g, Current Perf = %1.4f, Best Perf = %1.4f\nCurrent HP: %s\nBest HP: %s',...
                 labelstr, iter, max_iter_bayes, cost_next, best_cost, currentHP, bestHP);
         end
-
-        % Create variate mask according to selected features
-        GD = nk_GenVI(mapYi, GD, CV, f, d, nclass, next_idx, curlabel);
-    end
-    
-    for curclass = 1:nclass, DISP.P{curclass} = Ps{curclass}(best_index,:); end
-    if npreml > -1
-        if combcell
-            next_preproc = cell2mat(Ps{1}(best_index, end-npreml:end));
-        else
-            next_preproc = Ps{1}(best_index, end-npreml:end);
-        end
-        [~, next_preproc_index] = ismember(next_preproc, pp, 'rows');
-    else
-        next_preproc_index = 1;
-    end
-    best_mapYi = nk_MLOptimizer_ExtractDimMat(mapY, next_preproc_index, best_cPs);
-    best_FilterSubsets = nk_CreateSubSets(best_mapYi);
-    [CV1perf_final, CV2perf_final, models_final] = nk_CVPermFold(best_mapYi, nclass, ngroups, best_cPs, best_FilterSubsets, batchflag);    
-    [GD, MD, DISP] = nk_GridSearchHelper(GD, MD, DISP, best_index, nclass, ngroups, CV1perf_final, CV2perf_final, models_final);
+    end  
 end
 
 DISP.visited = [];

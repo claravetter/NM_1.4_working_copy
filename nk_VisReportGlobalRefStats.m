@@ -5,13 +5,13 @@ function nk_VisReportGlobalRefStats(I, I1, h, ilh, sigfl, isInter, n)
     % --- pull current columns (defensive) ---
     corrNow = []; pvalNow = [];
     if isInter
-        if isfield(I1,'VCV1WCORRREF') && numel(I1.VCV1WCORRREF) >= h && ...
-           iscell(I1.VCV1WCORRREF{h}) && numel(I1.VCV1WCORRREF{h}) >= n && ...
+        if isfield(I1,'VCV1WCORRREF') && numel(I1.VCV1WCORRREF) <= h && ...
+           iscell(I1.VCV1WCORRREF{h}) && numel(I1.VCV1WCORRREF{h}) <= n && ...
            ~isempty(I1.VCV1WCORRREF{h}{n})
             corrNow = I1.VCV1WCORRREF{h}{n}(:, ilh);
         end
-        if isfield(I1,'VCV1WPERMREF') && numel(I1.VCV1WPERMREF) >= h && ...
-           iscell(I1.VCV1WPERMREF{h}) && numel(I1.VCV1WPERMREF{h}) >= n && ...
+        if isfield(I1,'VCV1WPERMREF') && numel(I1.VCV1WPERMREF) <= h && ...
+           iscell(I1.VCV1WPERMREF{h}) && numel(I1.VCV1WPERMREF{h}) <= n && ...
            ~isempty(I1.VCV1WPERMREF{h}{n})
             pvalNow = I1.VCV1WPERMREF{h}{n}(:, ilh);
         end
@@ -89,7 +89,11 @@ function nk_VisReportGlobalRefStats(I, I1, h, ilh, sigfl, isInter, n)
         if ~hasPriorFiniteP
             continue
         end
-
+        if kl==1
+            if exist("n","var") || ~isempty(n)
+                fprintf('\n\t\t\tModality #%g - Component summary:', n)
+            end
+        end
         % Current corr (may be NaN if seed/new-tail)
         ckl = NaN;
         if ~isempty(corrNow) && kl <= numel(corrNow)

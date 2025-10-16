@@ -798,8 +798,12 @@ if hObject.Value == 1 && strcmp(hObject.String{1}, '↗ Inspect modality statist
     display_plot_modality_shares(handles);
 elseif strcmp(hObject.String{1}, '↗ Inspect modality statistics…')
     handles.curmodal = hObject.Value-1;
+    load_selVisMeasDropDown(handles);
+    load_selComponents(handles.selComponent, handles.visdata{handles.curmodal}, handles.curclass);
     handles = display_visual(handles);
 else
+    load_selVisMeasDropDown(handles);
+    load_selComponents(handles.selComponent, handles.visdata{handles.curmodal}, handles.curclass);
     handles.curmodal = hObject.Value;
     handles = display_visual(handles);
 end

@@ -1,5 +1,7 @@
 function [I1, Tx_out, Tx_unmatched, assignmentVec, signCorrections, VCV1REF] = ...
-            nk_VisXRealignComponentsHelper(I1, inp, haveRef, Tx_in, VCV1REF, nM, il, ill, currmodal, h, Fadd, Vind, nonZeroMasks)
+            nk_VisXRealignComponentsHelper(I1, inp, haveRef, Tx_in, VCV1REF, nM, il, ill, currmodal, h, Fadd, Vind)
+
+global SVM
 
 isInter = ~isempty(currmodal);
 if ~isInter, currmodal = 1; Vind = ones(numel(Fadd),1); end
@@ -42,7 +44,6 @@ else
     end
 end
 
-
 %% ---------- Ensure I1 destination containers exist *now* ----------
 if isInter
     % Early fusion: operating accross modalities => mapping to one
@@ -62,7 +63,6 @@ if need_bootstrap
     VCV1WCORRREF    = nan(nRef_combined, ill);
     ModComp_L2n     = nan(nRef_combined, ill);
     if nM>1
-        ModAgg_L2nShare = nan(nM, ill);
         if ~isInter
             ModComp_L2nCube = nan(nRef_combined, nM, ill); 
         end
@@ -73,13 +73,11 @@ else
         VCV1WCORRREF    =  I1.VCV1WCORRREF{h};
         ModComp_L2n     =  I1.ModComp_L2n{h};
         if nM>1
-            ModAgg_L2nShare =  I1.ModAgg_L2nShare{h};
             ModComp_L2nCube =  I1.ModComp_L2nCube{h}; 
         end
     else
         VCV1WPERMREF    = I1.VCV1WPERMREF{h}{currmodal};
         VCV1WCORRREF    = I1.VCV1WCORRREF{h}{currmodal};
-        ModAgg_L2nShare = I1.ModAgg_L2nShare{h};
         ModComp_L2n     = I1.ModComp_L2n{h}{currmodal};
     end
 end
@@ -107,7 +105,7 @@ c = corrPerComp(:);
 oneTol = 1e-6; idx_nearOne = (c >= 1-oneTol) & (c <= 1+oneTol); c(idx_nearOne) = NaN;
 VCV1WCORRREF(1:nRef_combined, il(h)) = c;
 
-%% ---------- L2 magnitudes (three views, depending on fusion mode) ----------
+%% ---------- L2 magnitudes (two views, depending on fusion mode) ----------
 % Tx_out is:
 %   - EARLY fusion: cell(1,nM), each Tx_out{n} is [nFeat_n x nRef_combined] in reference order
 %   - INTER fusion: a single matrix [nFeat_curr x nRef_combined] for the current modality
@@ -120,14 +118,14 @@ if ~isInter
     for n = 1:nM
         Xn = Tx_out{n};                           % [nFeat_n x nRef_combined] in ref order
         if ~isempty(Xn)
-            v = nan_l2n_block(Xn);                % [1 x nRef_combined] or [nRef_combined x 1]
+            v = nk_VisXComputeLpShares(Xn, SVM, false); % [1 x nRef_combined] or [nRef_combined x 1]
             if isrow(v), v = v(:); end
             L2_ref_mod(1:numel(v), n) = v(1:min(numel(v), nRef_combined));
         end
     end
 
     % 2) Combined per-component L2 across modalities (sum over nM)
-    L2_ref_combined = nm_nansum(L2_ref_mod, 2);   % [nRef_combined x 1]
+    L2_ref_combined = sum(L2_ref_mod, 2, 'omitnan');   % [nRef_combined x 1]
 
     % (a) Global per-component stats
     ModComp_L2n(1:nRef_combined, il(h)) = L2_ref_combined;
@@ -137,56 +135,12 @@ if ~isInter
         for n = 1:nM
             ModComp_L2nCube(1:nRef_combined, n, il(h)) = L2_ref_mod(:, n);
         end
-
-        % 3) Aggregate modality shares (robust)
-        share_vec = nan(nM,1);
-        mod_sum   = nan(nM,1);
-        mod_has   = false(nM,1);
-        for n = 1:nM
-            col = L2_ref_mod(:, n);
-            mod_has(n) = any(isfinite(col));
-            if mod_has(n)
-                mod_sum(n) = nm_nansum(col);
-            else
-                mod_sum(n) = NaN;
-            end
-        end
-
-        denom = nm_nansum(mod_sum(mod_has));
-        if denom > 0 && isfinite(denom)
-            share_vec(mod_has) = mod_sum(mod_has) ./ denom;
-
-            % clamp tiny FP drift and guard against nonsense
-            eps1 = 1e-9;
-            share_vec(share_vec < 0    & abs(share_vec) < eps1) = 0;
-            share_vec(share_vec > 1    & (share_vec - 1) < eps1) = 1;
-            bad = share_vec < -eps1 | share_vec > 1+eps1 | ~isfinite(share_vec);
-            share_vec(bad) = NaN;
-
-            % exact renormalization over finite entries (optional)
-            sfin = sum(share_vec(isfinite(share_vec)));
-            if sfin > 0
-                share_vec(isfinite(share_vec)) = share_vec(isfinite(share_vec)) ./ sfin;
-            end
-        else
-            share_vec(:) = NaN;  % no energy this model → all NaN
-        end
-
-        ModAgg_L2nShare(:, il(h)) = share_vec;
-    else
-        % Single modality: share is trivially 1 when any energy exists
-        if any(isfinite(L2_ref_combined))
-            ModAgg_L2nShare(1, il(h)) = 1;
-        else
-            ModAgg_L2nShare(1, il(h)) = NaN;
-        end
     end
-
 else
     % ---------- INTERMEDIATE FUSION (per-DR modality handled in its own call) ----------
     % Tx_out is this modality’s ref-ordered map: [nFeat_curr x nRef_combined]
     if ~isempty(Tx_out)
-        v = nan_l2n_block(Tx_out);                % per-component L2, [nRef_combined x 1]
+        v = nk_VisXComputeLpShares(Tx_out, SVM, false);                % per-component L2, [nRef_combined x 1]
         if isrow(v), v = v(:); end
     else
         v = nan(nRef_combined,1);
@@ -194,13 +148,6 @@ else
 
     % Store this modality’s per-component magnitudes
     ModComp_L2n(1:nRef_combined, il(h)) = v;
-
-    % This modality’s total “energy” (kept as scalar for later CV2 aggregation)
-    if any(isfinite(v))
-        ModAgg_L2nShare = sum(v, 'omitnan');
-    else
-        ModAgg_L2nShare = NaN;
-    end
 end
 
 %% ---------- Copy back containers to I1 -----------
@@ -214,4 +161,3 @@ else
     I1.ModComp_L2n{h} = ModComp_L2n;
     if nM>1, I1.ModComp_L2nCube{h} = ModComp_L2nCube; end
 end
-if nM>1, I1.ModAgg_L2nShare{h} = ModAgg_L2nShare; end

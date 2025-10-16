@@ -190,6 +190,7 @@ if ~isempty(analysis)
     % reduction method. If so, allow user to modify the memory mode and
     % thus compute correlation matrices and derived metrics
     PREPROCs = analysis.params.TrainParam.PREPROC(analysis.params.TrainParam.FUSION.M);
+    inp.decompfl = false(1,numel(PREPROCs));
     for i=1:numel(PREPROCs)
         inp.decompfl(i) = nk_DetIfDimRefInPREPROC(PREPROCs{i}, i);
     end

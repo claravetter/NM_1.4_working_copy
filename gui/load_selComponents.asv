@@ -24,24 +24,40 @@ end
 meanPval = []; meanCorr=[]; selPct = [];
 if isInter
     if ~isempty(idx)
-        meanPval = cmp{idx}.mean_p_cv2;
-        meanCorr = cmp{idx}.mean_r_cv2;
-        selPct = cmp{idx}.coverage_cv1(:,1) *100 ./ cmp{idx}.coverage_cv1(:,2);
-        keptMask  = visData.CompKept{1}{idx};    
+        meanPval = visData.Report{curclass}.components{idx}.mean_p_cv2;
+        meanCorr = visData.Report{curclass}.components{idx}.mean_r_cv2;
+        selPct = visData.Report{curclass}.components{idx}.coverage_cv1(:,1) *100 ...
+            ./ visData.Report{curclass}.components{idx}.coverage_cv1(:,2);
     end
 else
-    meanPval = cmp.mean_p_cv2;
-    meanCorr = cmp.mean_r_cv2;
-    selPct = cmp.coverage_cv1(:,1) *100 ./ cmp.coverage_cv1(:,2);
-    keptMask  = visData.CompKept{1}{idx};
+    meanPval = visData.Report{curclass}.components.mean_p_cv2;
+    meanCorr = visData.Report{curclass}.components.mean_r_cv2;
+    selPct = visData.Report{curclass}.components.coverage_cv1(:,1) *100 ./ visData.Report{curclass}.components.coverage_cv1(:,2);
 end
 
+if isInter
+    if ~isempty(idx)
+        
+    end
+else
+    
+end
+
+
+if isInter
+    if ~isempty(idx)
+        
+    else
+        
+    end
+end
 if isempty(meanCorr) && isempty(meanPval)
     % If there are no kept components, disable
     set(hDropdown, 'String', {'<no components available>'}, ...
                        'Enable','off', 'Value',1, 'UserData',[]);
     return
 end
+keptMask  = visData.CompKept{1};
 idxs      = find(keptMask);
 nKept     = numel(idxs);
 
@@ -72,4 +88,4 @@ ud.modality     = curmod;
 ud.class        = curclass;
 
 set(hDropdown, 'String', items, 'Value', 2, 'Enable', 'on', 'UserData', ud);
-
+end

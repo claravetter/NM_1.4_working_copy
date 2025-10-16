@@ -458,16 +458,25 @@ for f=1:ix % Loop through CV2 permutations
                         I1.VCV1WPERM{h}     = nan(maxFsize, ill); 
                     end
                     
+                    % ------ Setup I1 containers ------
                     for n=1:nM
                         
                         % Retrieve dimensionality of target space
-                        D                   = getD(FUSION.flag, inp, n);
+                        D = getD(FUSION.flag, inp, n);
 
                         % Setup container for weight storage
                         if ~inp.isInter
-                            I1.VCV1{h,n}        = nan(D, ill, maxTrWidth, 'single'); 
+                            if ~any(decompfl) || ~compwise % no DR or component-wise processing
+                                I1.VCV1{h,n}        = nan(D, ill, 'single'); 
+                            else % DR involved
+                                I1.VCV1{h,n}        = nan(D, ill, maxTrWidth, 'single'); 
+                            end
                         else
-                            I1.VCV1{h,n}        = nan(D, ill, 0, 'single'); 
+                            if ~decompfl(n) || ~compwise % no DR in actual modality (e.g. intermediate fusion) or component-wise processing
+                                I1.VCV1{h,n}        = nan(D, ill, 'single'); 
+                            else % DR involved
+                                I1.VCV1{h,n}        = nan(D, ill, 0, 'single'); 
+                            end
                         end
                         if ~memorytested
                             memoryprob = false;
@@ -504,17 +513,30 @@ for f=1:ix % Loop through CV2 permutations
                         
                         % Prepare for permutation analysis
                         if permfl
-                            if inp.isInter
-                                I1.VCV1PERM{h, n}   = nan(D, ill, 0, 'single');
-                                I1.VCV1PERM_FDR{h, n} = nan(D, ill, 0, 'single');
-                                I1.VCV1ZSCORE{h, n} = nan(D, ill, 0, 'single');
+                            if ~inp.isInter
+                                if ~any(decompfl) || ~compwise
+                                    I1.VCV1PERM{h, n}   = nan(D, ill, 'single');
+                                    I1.VCV1PERM_FDR{h, n} = nan(D, ill, 'single');
+                                    I1.VCV1ZSCORE{h, n} = nan(D, ill, 'single');
+                                else
+                                    I1.VCV1PERM{h, n}   = nan(D, ill, maxTrWidth, 'single');
+                                    I1.VCV1PERM_FDR{h, n} = nan(D, ill, maxTrWidth, 'single');
+                                    I1.VCV1ZSCORE{h, n} = nan(D, ill, maxTrWidth, 'single');
+                                end
                             else
-                                I1.VCV1PERM{h, n}   = nan(D, ill, maxTrWidth, 'single');
-                                I1.VCV1PERM_FDR{h, n} = nan(D, ill, maxTrWidth, 'single');
-                                I1.VCV1ZSCORE{h, n} = nan(D, ill, maxTrWidth, 'single');
+                                if ~decompfl(n) || ~compwise
+                                    I1.VCV1PERM{h, n}   = nan(D, ill, 'single');
+                                    I1.VCV1PERM_FDR{h, n} = nan(D, ill, 'single');
+                                    I1.VCV1ZSCORE{h, n} = nan(D, ill, 'single');
+                                else
+                                    I1.VCV1PERM{h, n}   = nan(D, ill, 0, 'single');
+                                    I1.VCV1PERM_FDR{h, n} = nan(D, ill, 0, 'single');
+                                    I1.VCV1ZSCORE{h, n} = nan(D, ill, 0, 'single');
+                                end
                             end
                         end
-
+                        
+                        % Prepate for model-space statistics
                         if compwise && sigfl
                             if inp.isInter
                                 if decompfl(n)
@@ -808,23 +830,31 @@ for f=1:ix % Loop through CV2 permutations
                                         
                                         % Now evaluate feature significance using the FDR-corrected values.
                                         Fadd = (I1.VCV1WPERM{h}(1:nComp,il(h)) <= sigPthr);
-                                        if ~sum(Fadd)
-                                            if inp.isInter
-                                                 uVals = unique(Vind(:)).';
-                                                 for nv = uVals
-                                                    idx_Vx = find(Vind == nv);
+                                        if inp.isInter
+                                            % We have to check
+                                            % modality-wise
+                                             uVals = unique(Vind(:)).';
+                                             for nv = uVals
+                                                idx_Vx = find(Vind == nv);
+                                                if ~nnz(Fadd(idx_Vx)) 
                                                     minP = min(I1.VCV1WPERM{h}(idx_Vx,il(h)));
                                                     fFadd = I1.VCV1WPERM{h}(idx_Vx,il(h)) == minP;
                                                     Fadd(idx_Vx(fFadd)) = true;
-                                                 end
-                                            else
+                                                    fprintf('\n\t\t\t=> Mod #%g: No feature survives %s alpha = %g => relaxing to min P = %g [%g feature(s)].', nv, alpha_str, sigPthr, minP, nnz(fFadd) );
+                                                else
+                                                    fprintf('\n\t\t\t=> Mod #%g: %g / %g feature(s) significant at %s alpha = %g.', nv, nnz(Fadd(idx_Vx)), numel(idx_Vx), alpha_str, sigPthr);
+
+                                                end
+                                             end
+                                        else
+                                            if ~nnz(Fadd)
                                                 minP = min(I1.VCV1WPERM{h}(1:nComp,il(h)));
                                                 fFadd = I1.VCV1WPERM{h}(1:nComp,il(h)) == minP;
                                                 Fadd = false(nComp,1); Fadd(fFadd) = true;
+                                                fprintf('| No feature survives %s alpha = %g => relaxing to min P = %g (%g features).', alpha_str, sigPthr, minP, nnz(Fadd) );
+                                            else
+                                                fprintf('| %g / %g features significant at %s alpha = %g.', sum(Fadd), numel(Fadd), alpha_str, sigPthr);
                                             end
-                                            fprintf('| No feature significant at %s alpha = %g => relaxing to min P = %g (%g features).', alpha_str, sigPthr, minP, nnz(Fadd) );
-                                        else
-                                            fprintf('| %g / %g features significant at %s alpha = %g.', sum(Fadd), numel(Fadd), alpha_str, sigPthr);
                                         end
                                         I1.Fadd{h,il(h)} = Fadd;
                                         I1.Vind{h,il(h)} = Vind;
@@ -842,24 +872,19 @@ for f=1:ix % Loop through CV2 permutations
                                     if compwise
                                         %% ================= GLOBAL (CROSS-MODALITY) REALIGNMENT — nk_VisModelsC =================
                                         [I, I1, Tx, Psel, Rx, SRx, PAx, assignmentVec, signCorrections ] = nk_VisXRealignComponents(I, I1, h, Tx, Psel, Rx, SRx, PAx, Fadd, Vind, il, inp, nM, ill);
-                                        
-                                    else
-                                        % ===== per-modality aggregate share for aggregated pathways =====
-                                        if nM>1 && ~inp.stacking
-                                            L2n_mod = zeros(nM,1);
-                                            for n = 1:nM
-                                                if isempty(Wx{n}), continue; end
-                                                L2n_mod(n) = nan_l2n_block(Wx{n});
-                                            end
-                                            den = sum(L2n_mod);
-                                            share = zeros(nM,1);
-                                            if den > 0, share = L2n_mod / den; end
-                                            
-                                            if isempty(I1.ModAgg_L2nShare{h})
-                                                I1.ModAgg_L2nShare{h} = nan(nM, ill);
-                                            end
-                                            I1.ModAgg_L2nShare{h}(:, il(h)) = share;
+                                    end
+
+                                    % ===== per-modality aggregate share for aggregated pathways =====
+                                    if nM>1 && ~inp.stacking
+                                        if isempty(I1.ModAgg_L2nShare{h}), I1.ModAgg_L2nShare{h} = nan(nM, ill); end
+                                        v=nan(nM,1);
+                                        for n=1:nM
+                                            vn = nk_VisXComputeLpShares(Tx{n}, SVM, false); 
+                                            if numel(v)>1, v(n) = sum(vn,'omitnan'); else, v(n) = vn; end
                                         end
+                                        tot = sum(v);
+                                        if tot > 0, Lp_share = v ./ tot; else, Lp_share = 0; end
+                                        I1.ModAgg_L2nShare{h}(:, il(h)) = Lp_share; 
                                     end
 
                                     % --- Perform permutation analysis of model and model weights ---
@@ -1126,13 +1151,9 @@ for f=1:ix % Loop through CV2 permutations
                                                     badcoords = ~badcoords;                 % valid feature positions
                                                     upd = badcoords & Fpind;                % 1×nFeat logical
                                                     % ensure the 3rd dim exists and grow by one slice (filled with NaN)
-                                                    j = size(I1.VCV1PERM{h,n}, 3) + 1;
-                                                    I1.VCV1PERM{h,n}(:, :, j) = NaN;
-                                                    I1.VCV1PERM{h,n}(upd, il(h), j) = PvalsVec(upd);
-                                                    I1.VCV1PERM_FDR{h,n}(:, :, j) = NaN;
-                                                    [~,~,~, I1.VCV1PERM_FDR{h,n}(upd, il(h), j)] = fdr_bh(PvalsVec(upd), 0.05, 'pdep');
-                                                    I1.VCV1ZSCORE{h,n}(:, :, j) = NaN;
-                                                    I1.VCV1ZSCORE{h,n}(upd, il(h), j) = ZvalsVec(upd);
+                                                    I1.VCV1PERM{h,n}(upd, il(h)) = PvalsVec(upd);
+                                                    [~,~,~, I1.VCV1PERM_FDR{h,n}(upd, il(h))] = fdr_bh(PvalsVec(upd), 0.05, 'pdep');
+                                                    I1.VCV1ZSCORE{h,n}(upd, il(h)) = ZvalsVec(upd);
                                                 end
                                             end
                                             
@@ -1163,9 +1184,13 @@ for f=1:ix % Loop through CV2 permutations
                                             end
                                         end
                                     else
-                                        if decompfl(n) && compwise
-                                            % ========================= REPORTING ( permfl == false ) =========================
-                                            nk_VisReportGlobalRefStats(I, I1, h, il(h), sigfl, inp.isInter);
+                                        if any(decompfl) && compwise
+                                            for n=1:nM
+                                                if decompfl(n)
+                                                    % ========================= REPORTING ( permfl == false ) =========================
+                                                    nk_VisReportGlobalRefStats(I, I1, h, il(h), sigfl, inp.isInter,n);
+                                                end
+                                            end
                                         end
                                     end
                                     
@@ -1315,7 +1340,7 @@ for f=1:ix % Loop through CV2 permutations
                     [~,vnam] = fileparts(vpth);
                     ind0(ll) = true; 
                     fprintf('\nLoading visualization data: %s.', vnam);
-                    [I, I1] = nk_VisXHelperC('align', nM, nclass, decompfl, permfl, sigfl, ix, jx, I, inp, ll, nperms, vpth, compwise, ill);
+                    [I, I1] = nk_VisXHelperC('align', nM, nclass, decompfl, permfl, sigfl, ix, jx, I, inp, ll, nperms, vpth, compwise);
                     [I, I1] = nk_VisXHelperC('accum', nM, nclass, decompfl, permfl, sigfl, ix, jx, I, inp, ll, nperms, I1, compwise);
                     [I, I1] = nk_VisXHelperC('report', nM, nclass, decompfl, permfl, sigfl, ix, jx, I, inp, ll, nperms, I1, compwise);
                     % if things are getting huge, prune to only keep “stable” components:
@@ -1328,7 +1353,6 @@ for f=1:ix % Loop through CV2 permutations
                     ol=ol+1;
                 end
                 if isfield(I1,'PCV1SUM'), PCV1SUMflag=true; else, PCV1SUMflag = false; end
-
         end
 
         % Assemble observed and permuted model predictions of current CV2
@@ -1549,36 +1573,36 @@ if ~batchflag
         % Probability of feature selection across all CV2 * CV1 partitions
         for h=1:nclass
             NumPredDiv = repmat(I.VCV2NMODEL(h),size(I.VCV2SEL{h,n},1),1);
-            if ~decompfl 
+            if ~decompfl(n) 
                 if PCV1SUMflag && h==1, I.PCV2 = zeros(D,nclass); end
                 I.PCV2(:,h) = I.PCV2SUM{h, n}' ./ NumPredDiv; 
                 if size(I.VCV2PEARSON{h, n},2)>1
                     % Compute mean and SD univariate association measures
                     % (currently Pearson and Spearman), and their uncorrected
                     % and FDR-corrected statistical significance
-                    I.VCV2PEARSON_STD{h,n} = nm_nanstd(I.VCV2PEARSON{h, n},2);
-                    I.VCV2PEARSON{h,n} = nm_nanmedian(I.VCV2PEARSON{h, n},2);
-                    I.VCV2SPEARMAN_STD{h,n} = nm_nanstd(I.VCV2SPEARMAN{h, n},2);
-                    I.VCV2SPEARMAN{h,n} = nm_nanmedian(I.VCV2SPEARMAN{h, n},2);
-                    I.VCV2PEARSON_UNCORR_PVAL_STD{h,n} = nm_nanstd(I.VCV2PEARSON_UNCORR_PVAL{h, n},2);
-                    I.VCV2PEARSON_UNCORR_PVAL{h,n} = nm_nanmedian(I.VCV2PEARSON_UNCORR_PVAL{h, n},2);
-                    I.VCV2SPEARMAN_UNCORR_PVAL_STD{h,n} = nm_nanstd(I.VCV2SPEARMAN_UNCORR_PVAL{h, n},2);
-                    I.VCV2SPEARMAN_UNCORR_PVAL{h,n} = nm_nanmedian(I.VCV2SPEARMAN_UNCORR_PVAL{h, n},2);
-                    I.VCV2PEARSON_FDR_PVAL{h,n} = nm_nanmedian(I.VCV2PEARSON_FDR_PVAL{h, n},2);
-                    I.VCV2SPEARMAN_FDR_PVAL{h,n} = nm_nanmedian(I.VCV2SPEARMAN_FDR_PVAL{h, n},2);
+                    I.VCV2PEARSON_STD{h,n} = std(I.VCV2PEARSON{h, n}, [], 2, 'omitnan');
+                    I.VCV2PEARSON{h,n} = mean(I.VCV2PEARSON{h, n},2, 'omitnan');
+                    I.VCV2SPEARMAN_STD{h,n} = std(I.VCV2SPEARMAN{h, n}, [], 2, 'omitnan');
+                    I.VCV2SPEARMAN{h,n} = mean(I.VCV2SPEARMAN{h, n}, 2, 'omitnan');
+                    I.VCV2PEARSON_UNCORR_PVAL_STD{h,n} = std(I.VCV2PEARSON_UNCORR_PVAL{h, n}, [], 2, 'omitnan');
+                    I.VCV2PEARSON_UNCORR_PVAL{h,n} = mean(I.VCV2PEARSON_UNCORR_PVAL{h, n},2, 'omitnan');
+                    I.VCV2SPEARMAN_UNCORR_PVAL_STD{h,n} = std(I.VCV2SPEARMAN_UNCORR_PVAL{h, n}, [], 2, 'omitnan');
+                    I.VCV2SPEARMAN_UNCORR_PVAL{h,n} = mean(I.VCV2SPEARMAN_UNCORR_PVAL{h, n},2, 'omitnan');
+                    I.VCV2PEARSON_FDR_PVAL{h,n} = mean(I.VCV2PEARSON_FDR_PVAL{h, n},2, 'omitnan');
+                    I.VCV2SPEARMAN_FDR_PVAL{h,n} = mean(I.VCV2SPEARMAN_FDR_PVAL{h, n},2, 'omitnan');
                     % Compute analytical p values using the method of
                     % Gaonkar et al. if linear SVM was the base learner
                     if linsvmfl
-                        I.VCV2PVAL_ANALYTICAL{h,n} = nm_nanmedian(I.VCV2PVAL_ANALYTICAL{h, n},2);
-                        I.VCV2PVAL_ANALYTICAL_FDR{h,n} = nm_nanmedian(I.VCV2PVAL_ANALYTICAL_FDR{h, n},2);
+                        I.VCV2PVAL_ANALYTICAL{h,n} = mean(I.VCV2PVAL_ANALYTICAL{h, n},2, 'omitnan');
+                        I.VCV2PVAL_ANALYTICAL_FDR{h,n} = mean(I.VCV2PVAL_ANALYTICAL_FDR{h, n},2, 'omitnan');
                     end
                     if ~isempty(I.VCV2CORRMAT{h,n})
-                        I.VCV2CORRMAT{h,n} = nm_nanmedian(I.VCV2CORRMAT{h, n},3);
-                        I.VCV2CORRMAT_STD{h,n} = nm_nanstd(I.VCV2CORRMAT{h, n},3);
-                        I.VCV2CORRMAT_UNCORR_PVAL{h,n} = nm_nanmedian(I.VCV2CORRMAT_UNCORR_PVAL{h, n},3);
-                        I.VCV2CORRMAT_UNCORR_PVAL_STD{h,n} = nm_nanstd(I.VCV2CORRMAT_UNCORR_PVAL{h, n},3);
-                        I.VCV2CORRMAT_FDR_PVAL{h,n} = nm_nanmedian(I.VCV2CORRMAT_FDR_PVAL{h, n},3);
-                        I.VCV2CORRMAT_FDR_PVAL_STD{h,n} = nm_nanstd(I.VCV2CORRMAT_FDR_PVAL{h, n},3);
+                        I.VCV2CORRMAT{h,n} = mean(I.VCV2CORRMAT{h, n}, 3, 'omitnan');
+                        I.VCV2CORRMAT_STD{h,n} = std(I.VCV2CORRMAT{h, n}, [], 3, 'omitnan');
+                        I.VCV2CORRMAT_UNCORR_PVAL{h,n} = mean(I.VCV2CORRMAT_UNCORR_PVAL{h, n},3, 'omitnan');
+                        I.VCV2CORRMAT_UNCORR_PVAL_STD{h,n} = std(I.VCV2CORRMAT_UNCORR_PVAL{h, n}, [], 3, 'omitnan');
+                        I.VCV2CORRMAT_FDR_PVAL{h,n} = mean(I.VCV2CORRMAT_FDR_PVAL{h, n},3, 'omitnan');
+                        I.VCV2CORRMAT_FDR_PVAL_STD{h,n} = std(I.VCV2CORRMAT_FDR_PVAL{h, n}, [], 3, 'omitnan');
                     end
                 end
             end
@@ -1604,13 +1628,13 @@ if ~batchflag
             
             if decompfl(n)
                     %Grand mean scores: CV2 mean of CV1 means of weight vectors
-                    I.VCV2MEAN_CV1{h,n} = squeeze(nm_nanmean(I.VCV2MEAN{h,n},2));
+                    I.VCV2MEAN_CV1{h,n} = squeeze(mean(I.VCV2MEAN{h,n},2, 'omitnan'));
                     % Compute grand mean of CV1 stds / sems of weight vectors 
-                    I.VCV2SE_CV1{h,n}   = squeeze(nm_nanmean(I.VCV2STD{h,n},2));
+                    I.VCV2SE_CV1{h,n}   = squeeze(mean(I.VCV2STD{h,n},2, 'omitnan'));
             else
                 if size(I.VCV2SQ{h, n},2)>1
-                    I.VCV2MEAN_CV1{h,n} = nm_nanmean(I.VCV2MEAN{h,n},2);
-                    I.VCV2SE_CV1{h,n}   = nm_nanmean(I.VCV2STD{h,n},2);
+                    I.VCV2MEAN_CV1{h,n} = mean(I.VCV2MEAN{h,n},2, 'omitnan');
+                    I.VCV2SE_CV1{h,n}   = mean(I.VCV2STD{h,n},2, 'omitnan');
                 else
                     I.VCV2MEAN_CV1{h,n} = I.VCV2MEAN{h,n};
                     I.VCV2SE_CV1{h,n}   = I.VCV2STD{h,n};
@@ -1659,7 +1683,7 @@ if ~batchflag
                     % Robust guard
                     if ~isempty(S) && isnumeric(S)
                         % Row-wise stats
-                        med  = nm_nanmedian(S, 2);
+                        med  = nm_nanquantile(S, 0.50, 2);
                         lo95 = nm_nanquantile(S, 0.025, 2);
                         hi95 = nm_nanquantile(S, 0.975, 2);
                         nn   = sum(isfinite(S), 2);
@@ -1679,7 +1703,7 @@ if ~batchflag
                     % Robust guard
                     if ~isempty(S) && isnumeric(S)
                         % Row-wise stats
-                        med  = nm_nanmedian(S, 2);
+                        med  = nm_nanquantile(S, 0.50, 2);
                         lo95 = nm_nanquantile(S, 0.025, 2);
                         hi95 = nm_nanquantile(S, 0.975, 2);
                         nn   = sum(isfinite(S), 2);

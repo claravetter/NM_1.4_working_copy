@@ -161,7 +161,7 @@ for curlabel = 1:nl
             elaps, labelstr, algostr, f, d , pltcnt, pltmax, pltperc);
     [GD, MD, DISP] = nk_GridSearchHelper(GD, MD, DISP, current_index, nclass, ngroups, CV1perf, CV2perf, models);
     if isfield(CV1perf,'detrend'), GD.Detrend{current_index} = CV1perf.detrend; end
-
+    GD = nk_GenVI(mapYi, GD, CV, f, d, nclass, current_index, curlabel);
     current_cost = GD.TR(current_index);
     best_index = current_index;
     best_cost = current_cost;
@@ -242,6 +242,8 @@ for curlabel = 1:nl
                     elaps, labelstr, algostr, f, d , pltcnt, pltmax, pltperc, T);
             [GD, MD, DISP] = nk_GridSearchHelper(GD, MD, DISP, neighbor_index, nclass, ngroups, CV1perf_neighbor, CV2perf_neighbor, models_neighbor);
             if isfield(CV1perf,'detrend'), GD.Detrend{neighbor_index} = CV1perf.detrend; end
+            GD = nk_GenVI(neighbor_mapYi, GD, CV, f, d, nclass, neighbor_index, curlabel);
+
         end            
         neighbor_cost = GD.TR(neighbor_index);
         idxPs(neighbor_index) = true;
@@ -297,9 +299,6 @@ for curlabel = 1:nl
         else
             T = T * alpha;  % normal cooling for early iterations
         end
-                
-        % Create variate mask according to selected features
-        GD = nk_GenVI(mapYi, GD, CV, f, d, nclass, current_index, curlabel);
         
         if VERBOSE
             % Display visited indices analysis plots.
@@ -322,6 +321,11 @@ for curlabel = 1:nl
     [CV1perf_final, CV2perf_final, models_final] = nk_CVPermFold(best_mapYi, nclass, ngroups, best_cPs, best_FilterSubSets, batchflag);
     % Update the overall results (GD and MD) using the helper function.
     [GD, MD, DISP] = nk_GridSearchHelper(GD, MD, DISP, best_index, nclass, ngroups, CV1perf_final, CV2perf_final, models_final);
+    
+    if isfield(CV1perf,'detrend'), GD.Detrend{best_index} = CV1perf.detrend; end
+    % Create variate mask according to selected features
+    GD = nk_GenVI(best_mapYi, GD, CV, f, d, nclass, best_index, curlabel);
+
 end
 DISP.visited = [];
 

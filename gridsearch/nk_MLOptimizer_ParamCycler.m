@@ -180,7 +180,7 @@ for curlabel=1:nl
         [CV1perf, CV2perf, models] = nk_CVPermFold(mapYi, nclass, ngroups, cPs, FilterSubSets, batchflag);      
 
         % Transfer results from CV1perf and CV2perf to GD
-        % structure using nk_GridSearchHelper2 function
+        % structure using nk_GridSearchHelper 
         [GD, MD, DISP] = nk_GridSearchHelper(GD, MD, DISP, current_idx, nclass, ngroups, CV1perf, CV2perf, models);
        
         if isfield(CV1perf,'detrend'), GD.Detrend{current_idx} = CV1perf.detrend; end

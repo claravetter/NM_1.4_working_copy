@@ -2,19 +2,19 @@ function display_plot_modality_shares(handles, varargin)
 %DISPLAY_PLOT_MODALITY_SHARES  Interactive plot for L2n share reports.
 % Views (from ReportFinal):
 %   1) Modality-wise      -> Report{h}.modality
-%   2) Component-wise     -> Report{h}.components
-%   3) Component×Modality -> Report{h}.comp_by_mod
+%   2) Component-wise     -> Report{h}.components  (early) / Report{h}.components{m} (intermediate)
+%   3) Component-wise     -> (mean)
+%   4) Component-wise     -> mean r (CV2)
+%   5) Component-wise     -> mean -log10(p) (CV2)
+%   6) Component×Modality -> Report{h}.comp_by_mod
+%
+% In intermediate fusion:
+%   - R.modality holds cross-modality shares
+%   - R.components is a cell array over DR-based modalities (subset of all modalities)
 %
 % Usage:
 %   display_plot_modality_shares(handles, h)
-%   display_plot_modality_shares(handles, h, 'TopK', 20)   % for component-wise view
-%
-% Requirements:
-%   - handles.I2.Report{h} exists (see 'report_final' block in nk_VisXHelperC)
-%
-% UI:
-%   - Drop-down (top-left) to choose view
-%   - Export button (top-right) to save current view as .xlsx (Windows) or .csv (elsewhere)
+%   display_plot_modality_shares(handles, h, 'TopK', 20)
 
 %% Parse options
 p = inputParser;
@@ -29,11 +29,23 @@ if ~isfield(handles, 'visdata') || ~isfield(handles.visdata{1}, 'Report')
 end
 R = handles.visdata{1}.Report{handles.curclass};
 
+%%% NEW: detect intermediate fusion (components is cell array of per-DR-modality structs)
+isIntermediate = isfield(R,'components') && iscell(R.components) && ~isempty(R.components);
+
+%%% CHANGED: compwise availability now considers both early (struct) and intermediate (cell)
+if ~isfield(R,'components')
+    compwise = false;
+elseif isIntermediate
+    compwise = true;
+else
+    compwise = isstruct(R.components) && ~isempty(fieldnames(R.components));
+end
+
 %% Build figure and UI controls
-f = figure('Name','L2n shares — views', 'NumberTitle','off', 'Color','w', ...
+f = figure('Name','NM Global Modality Stats Viewer', 'NumberTitle','off', 'Color','w', ...
            'Units','normalized','Position',[0.15 0.15 0.7 0.7]);
 
-% Axes area (centered a bit more, more top margin)
+% Axes area
 ax = axes('Parent', f, 'Units','normalized', 'Position', [0.08 0.14 0.62 0.74]); %#ok<NASGU>
 
 % Table area
@@ -41,10 +53,10 @@ uitableHandle = uitable('Parent', f, 'Units','normalized', ...
     'Position',[0.72 0.14 0.26 0.74], ...
     'Data',{}, 'ColumnName',{}, 'RowName',{}, 'Visible','off');
 
-% View selector (more space above axes; left-top)
-if ~isfield(R,'components')
+% View selector
+if ~compwise
     viewNames = {'Modality-wise (median ± 95% CI)'};
-    compwise = false; compflag = 'off';
+    compflag = 'off';
 else
     viewNames = { ...
        'Modality-wise (median ± 95% CI)', ...
@@ -53,18 +65,19 @@ else
        'Component-wise mean r (CV2) ± 95% CI (Top-K)', ...
        'Component-wise mean p (CV2) ± 95% CI (Top-K)', ...
        'Component × Modality (median share)'};
-    compwise = true; compflag = 'on';
+    compflag = 'on';
 end
 
 popupView = uicontrol('Style','popupmenu', 'String',viewNames, ...
-    'Units','normalized', 'Position',[0.02 0.93 0.56 0.055], ...
+    'Units','normalized', 'Position',[0.02 0.93 0.42 0.055], ... %%% CHANGED (width to make room for modality popup)
     'FontSize',10, 'BackgroundColor',[0.95 0.95 0.95], 'Enable', compflag);
 
-% Export button (stays to the right; avoid overlap)
+% Export button
 btnExport = uicontrol('Style','pushbutton','String','Export current view…', ...
     'Units','normalized','Position',[0.82 0.93 0.16 0.055], ...
     'FontSize',10,'BackgroundColor',[0.9 0.95 1]);
 
+% Settings button (only useful when components exist)
 if compwise
     btnSettings = uicontrol('Style','pushbutton','String','⚙ Settings…', ...
         'Units','normalized','Position',[0.64 0.93 0.16 0.055], ...
@@ -72,31 +85,61 @@ if compwise
     btnSettings.Callback = @(src,evt) showSettingsDialog(f);
 end
 
+popupMod = [];
+drModNames = {};
+if isIntermediate
+    drModNames = getDRModNames(R);          % names for DR-based subset
+    if isempty(drModNames), drModNames = compose("Mod%02d", 1:numel(R.components)); end
+    popupMod = uicontrol('Style','popupmenu','String',drModNames, ...
+        'Units','normalized','Position',[0.46 0.93 0.16 0.055], ...
+        'FontSize',10,'BackgroundColor',[0.95 0.95 0.95], 'Enable','on');
+end
+
 % Store state in figure appdata
 S = struct();
 S.compwise = compwise;
+S.isIntermediate = isIntermediate;     %%% NEW
 S.R       = R;
 S.TopK    = TopK;
 S.handles = handles;
+S.modSel  = 1;                         %%% NEW default selected DR modality
+S.drModNames = drModNames;             %%% NEW
 setappdata(f, 'state', S);
 
 % Hook callbacks
-popupView.Callback = @(src,evt) redrawCurrent(f, popupView, uitableHandle); 
-btnExport.Callback = @(src,evt) exportCurrent(f, popupView);                
+popupView.Callback = @(src,evt) redrawCurrent(f, popupView, uitableHandle);  
+btnExport.Callback = @(src,evt) exportCurrent(f, popupView);                              
+
+if isIntermediate
+    popupMod.Callback = @(src,evt) onModChanged(f, popupView, uitableHandle, popupMod);   %%% NEW
+end
 
 % Initial draw
-redrawCurrent(f, popupView, uitableHandle);
+redrawCurrent(f, popupView, uitableHandle); 
 
-movegui(f,'onscreen'); drawnow; figure(f);  % bring to front once
-
+movegui(f,'onscreen'); drawnow; figure(f);
 end % main function
 
 %% =======================================================================
+function onModChanged(figHandle, popupView, uitableHandle, popupMod)
+% Update selected modality and redraw
+S = getappdata(figHandle,'state');
+if ~isempty(popupMod) && isvalid(popupMod)
+    S.modSel = max(1, min(popupMod.Value, numel(S.drModNames)));
+    setappdata(figHandle,'state',S);
+end
+redrawCurrent(figHandle, popupView, uitableHandle);
+end
+
+%% =======================================================================
 function redrawCurrent(figHandle, popupView, uitableHandle)
-cla; ax = gca;
+ax = gca;
+cla(ax, 'reset');           % reset axes state & clear callbacks
+set(ax, 'Visible','on');    % ensure axes are visible again
+axis(ax, 'on');             % (re-)enable axes drawing
 S = getappdata(figHandle, 'state');
 R = S.R;
-set(ax, 'YLimMode','auto', 'CLimMode','auto');  % reset on every redraw
+set(ax, 'YLimMode','auto', 'CLimMode','auto');
 viewIdx = popupView.Value;
 
 switch viewIdx
@@ -104,17 +147,13 @@ switch viewIdx
         % ===================== Modality-wise ============================
         M = R.modality;
         if isempty(M) || ~isfield(M,'median') || isempty(M.median)
-            text(0.5,0.5,'No modality-wise data','HorizontalAlignment','center'); axis off; 
-            set(uitableHandle,'Visible','off');
-            return;
+            showNoData(ax, uitableHandle, 'No modality-wise data'); return;
         end
 
-        % Prefer summary with 95% CI if present (lo95/hi95 optional)
         med  = M.median(:);
         names= M.names(:);
         nM   = numel(med);
-        
-        % Use precomputed CIs if present; otherwise none
+
         haveCI = isfield(M,'lo95') && isfield(M,'hi95') && numel(M.lo95)==nM && numel(M.hi95)==nM;
         if haveCI
             lo95 = M.lo95(:); hi95 = M.hi95(:);
@@ -126,9 +165,10 @@ switch viewIdx
             neg = max(0, y - lo95);
             pos = max(0, hi95 - y);
             errorbar(ax, x, y, neg, pos, 'k', 'LineStyle','none', 'LineWidth', 1.0);
+        else
+            y = med;
         end
-        
-        % Export table includes CI if present
+
         T = table(names, med, 'VariableNames',{'Modality','MedianShare'});
         if isfield(M,'mean') && numel(M.mean)==nM, T.MeanShare = M.mean(:); end
         if haveCI, T.CI_lo95 = lo95; T.CI_hi95 = hi95; end
@@ -142,208 +182,203 @@ switch viewIdx
         S.current.name    = sprintf('ModalityShares');
         setappdata(figHandle,'state',S);
         if strcmp(get(uitableHandle,'Visible'),'off')
-            set(ax,'Position',[0.08 0.14 0.86 0.74]); % wider when no table
+            set(ax,'Position',[0.08 0.14 0.86 0.74]);
         else
-            set(ax,'Position',[0.08 0.14 0.62 0.74]); % default
+            set(ax,'Position',[0.08 0.14 0.62 0.74]);
         end
         ax.XAxis.TickLabels = names;
         ax.YAxis.Label.String = 'Modality importance (L_p share)';
-        % compute upper target from median/CI, clamp to [0,1]
         if exist('lo95','var') && exist('hi95','var') && ~isempty(lo95) && ~isempty(hi95)
             set_lim_share(ax, y, lo95, hi95);
         else
-            set_lim_share(ax, y);
+            set_lim_share(ax, med);
         end
 
-    case {2,3}
-        % ===================== Component-wise ===========================
-        % Ensure the table is visible and shrink the axes so they don't overlap (even on first entry)
+    case {2,3,4,5}
+        % ===================== Component-wise (early or intermediate) ===
         set(uitableHandle,'Visible','on');
         ax = gca; set(ax,'Position',[0.08 0.14 0.62 0.74]);
-    
-        C = R.components;
-        if isempty(C) || ~isfield(C,'median_share') || isempty(C.median_share)
-            text(0.5,0.5,'No component-wise data','HorizontalAlignment','center'); axis off;
-            set(uitableHandle,'Visible','off'); return;
+
+        %%% NEW: select component container (struct vs cell{modIdx})
+        if S.isIntermediate
+            % guard against out-of-range modSel
+            modIdx = max(1, min(S.modSel, numel(R.components)));
+            C = R.components{modIdx};
+            modLabel = sprintf(' — %s', safePick(S.drModNames, modIdx));
+        else
+            C = R.components;
+            modLabel = '';
         end
-        med   = C.median_share(:);
-        meanV = C.mean_share(:);
+
+        if isempty(C) || ~isstruct(C) || ~isfield(C,'median_share') || isempty(C.median_share)
+           showNoData(ax, uitableHandle, 'No component-wise data'); return;
+        end
+
         names = C.names(:);
-        nRef  = numel(med);
-        ord   = C.order_by_median(:);
-        if isempty(ord), [~,ord] = sort(med,'descend','MissingPlacement','last'); end
+        % Median/mean shares may be missing for some views; handle per-case below.
 
-        K = min(getappdata(figHandle,'state').TopK, nRef);
-        pick = ord(1:K);
-
-        % Bar plot of median shares (top-K)
         switch viewIdx
-            case 2
-                vals = med(pick);
-                tit = sprintf('Component-wise L2 shares (Top-%d by median)', K);
-                ylab = 'L2 share (median)';
-            case 3
-                vals = meanV(pick);
-                tit = sprintf('Component-wise L2 shares (Top-%d by mean)', K);
-                ylab = 'L2 share (mean)';
-        end
-        bar(ax, vals, 'FaceAlpha', 0.9);
-        set(ax, 'XTick', 1:K, 'XTickLabel', names(pick), 'XTickLabelRotation', 30);
-        ylabel(ax, ylab);
-        title(ax, tit);
-        ax.YGrid='on'; ax.Box='on'; ax.FontSize=11;
-        set_lim_share(ax, vals(pick));
+            case {2,3}
+                med   = C.median_share(:);
+                meanV = C.mean_share(:);
+                nRef  = numel(med);
+                ord   = getOrder(C, med);
+                K     = min(getappdata(figHandle,'state').TopK, nRef);
+                pick  = ord(1:K);
 
-        % Build a side table with stats (mean p/r and presence)
-        T = table(names(pick), med(pick), meanV(pick), 'VariableNames',{'Component','MedianShare','MeanShare'});
-        if isfield(C,'mean_p_cv2'),  T.MeanP_CV2  = C.mean_p_cv2(pick);  end
-        if isfield(C,'mean_r_cv2'),  T.MeanR_CV2  = C.mean_r_cv2(pick);  end
-        if isfield(C,'present_cv2') && isfield(C,'denom_cv2')
-            pres = C.present_cv2(pick); den = C.denom_cv2(pick);
-            T.Presence = arrayfun(@(a,b) sprintf('%d/%d', a, max(1,b)), pres, den, 'uni',0);
-        end
-        % coverage across CV1 folds if present
-        if isfield(C,'coverage_cv1') && size(C.coverage_cv1,1) >= nRef
-            T.CV1Covg = arrayfun(@(a,b) sprintf('%d/%d', a, b), ...
-                          C.coverage_cv1(pick,1), C.coverage_cv1(pick,2), 'uni',0);
-        end
-        if isfield(S,'colorbar'), S.colorbar.Visible='off'; end
+                switch viewIdx
+                    case 2
+                        vals = med(pick);
+                        tit = sprintf('Component-wise L_p shares (Top-%d by median)%s', K, modLabel);
+                        ylab = 'L2 share (median)';
+                    case 3
+                        vals = meanV(pick);
+                        tit = sprintf('Component-wise L_p shares (Top-%d by mean)%s', K, modLabel);
+                        ylab = 'L2 share (mean)';
+                end
 
-        % Show table
-        set(uitableHandle, ...
-            'Data',        table2cell(T), ...
-            'ColumnName',  T.Properties.VariableNames, ...
-            'RowName',     [], ...
-            'Visible',     'on', ...
-            'ColumnEditable', false(1, width(T)));
+                bar(ax, vals, 'FaceAlpha', 0.9);
+                set(ax, 'XTick', 1:K, 'XTickLabel', names(pick), 'XTickLabelRotation', 30);
+                ylabel(ax, ylab); title(ax, tit);
+                ax.YGrid='on'; ax.Box='on'; ax.FontSize=11;
+                set_lim_share(ax, vals);
 
-        % Stash for export
-        S.current.table   = T;
-        S.current.matrix  = table2cell(T);   
-        S.current.headers = T.Properties.VariableNames;
-        S.current.name    = sprintf('ComponentShares_h%03d_Top%d', R.meta.h, K);
-        setappdata(figHandle,'state',S);
+                % Side table
+                T = table(names(pick), med(pick), meanV(pick), 'VariableNames',{'Component','MedianShare','MeanShare'});
+                if isfield(C,'mean_p_cv2'),  T.MeanP_CV2  = safePickVec(C.mean_p_cv2, pick);  end
+                if isfield(C,'mean_r_cv2'),  T.MeanR_CV2  = safePickVec(C.mean_r_cv2, pick);  end
+                if all(isfield(C, {'present_cv2','denom_cv2'}))
+                    pres = safePickVec(C.present_cv2, pick); den = safePickVec(C.denom_cv2, pick);
+                    T.Presence = arrayfun(@(a,b) sprintf('%d/%d', a, max(1,b)), pres, den, 'uni',0);
+                end
+                if isfield(C,'coverage_cv1') && size(C.coverage_cv1,1) >= numel(med)
+                    T.CV1Covg = arrayfun(@(a,b) sprintf('%d/%d', a, b), ...
+                                  C.coverage_cv1(pick,1), C.coverage_cv1(pick,2), 'uni',0);
+                end
+                if isfield(S,'colorbar'), S.colorbar.Visible='off'; end
 
-    case 4 % Correlation coefficients
-        C = R.components;
-        if isempty(C) || ~isfield(C,'mean_r_cv2') || isempty(C.mean_r_cv2)
-            text(0.5,0.5,'No component-wise CV2 correlation data','HorizontalAlignment','center'); axis off;
-            set(uitableHandle,'Visible','off'); return;
-        end
-        
-        names = C.names(:);
-        rmean = C.mean_r_cv2(:);
-        rlo   = []; rhi = [];
-        if isfield(C,'mean_r_lo95'), rlo = C.mean_r_lo95(:); end
-        if isfield(C,'mean_r_hi95'), rhi = C.mean_r_hi95(:); end
-    
-        nRef  = numel(rmean);
-        % Rank by median L2 share (keeps same ordering anchor as your main L2 report)
-        ord = C.order_by_median; if isempty(ord), [~,ord] = sort(C.median_share,'descend','MissingPlacement','last'); end
-        K = min(getappdata(figHandle,'state').TopK, nRef); pick = ord(1:K);
-    
-        bar(ax, rmean(pick), 'FaceAlpha', 0.9); hold(ax,'on');
-        if ~isempty(rlo) && ~isempty(rhi) && numel(rlo)==nRef && numel(rhi)==nRef
-            x = 1:K; y = rmean(pick);
-            neg = max(0, y - rlo(pick)); pos = max(0, rhi(pick) - y);
-            errorbar(ax, x, y, neg, pos, 'k', 'LineStyle','none', 'LineWidth', 1.0);
-        end
-        set(ax, 'XTick', 1:K, 'XTickLabel', names(pick), 'XTickLabelRotation', 30);
-        ylabel(ax, 'mean r (CV2)'); title(ax, sprintf('Component-wise mean correlation (Top-%d)', K));
-        ax.YGrid='on'; ax.Box='on'; ax.FontSize=11;
-        if exist('rlo','var') && exist('rhi','var') && ~isempty(rlo) && ~isempty(rhi)
-            set_lim_corr(ax, rmean(pick), rlo(pick), rhi(pick));
-        else
-            set_lim_corr(ax, rmean(pick));
-        end
-    
-        % Side table
-        T = table(names(pick), rmean(pick), 'VariableNames',{'Component','MeanR_CV2'});
-        if ~isempty(rlo) && ~isempty(rhi)
-            T.MeanR_lo95 = rlo(pick); T.MeanR_hi95 = rhi(pick);
-        end
-        if isfield(C,'present_cv2') && isfield(C,'denom_cv2')
-            T.Presence = arrayfun(@(a,b) sprintf('%d/%d', a, max(1,b)), C.present_cv2(pick), C.denom_cv2(pick), 'uni',0);
-        end
-        set(uitableHandle,'Data', table2cell(T), 'ColumnName', T.Properties.VariableNames, 'RowName',[], 'Visible','on');
-        if isfield(S,'colorbar'), S.colorbar.Visible='off'; end
-        if strcmp(get(uitableHandle,'Visible'),'off')
-            set(ax,'Position',[0.08 0.14 0.86 0.74]); % wider when no table
-        else
-            set(ax,'Position',[0.08 0.14 0.62 0.74]); % default
+                set(uitableHandle, 'Data', table2cell(T), 'ColumnName', T.Properties.VariableNames, ...
+                    'RowName',[], 'Visible','on', 'ColumnEditable', false(1, width(T)));
+
+                S.current.table   = T;
+                S.current.matrix  = table2cell(T);
+                S.current.headers = T.Properties.VariableNames;
+                if S.isIntermediate
+                    S.current.name = sprintf('ComponentShares_%s_Top%d', sanitizeName(modLabel(4:end)), K);
+                else
+                    S.current.name = sprintf('ComponentShares_h%03d_Top%d', R.meta.h, K);
+                end
+                setappdata(figHandle,'state',S);
+
+            case 4 % r (CV2)
+                if ~isfield(C,'mean_r_cv2') || isempty(C.mean_r_cv2)
+                      showNoData(ax, uitableHandle, 'No component-wise CV2 correlation data'); return;
+                end
+                names = C.names(:);
+                rmean = C.mean_r_cv2(:);
+                rlo   = getfield_ifexists(C,'mean_r_lo95');
+                rhi   = getfield_ifexists(C,'mean_r_hi95');
+
+                nRef  = numel(rmean);
+                ord   = getOrder(C, safeGet(C,'median_share', rmean));
+                K     = min(getappdata(figHandle,'state').TopK, nRef);
+                pick  = ord(1:K);
+
+                bar(ax, rmean(pick), 'FaceAlpha', 0.9); hold(ax,'on');
+                if ~isempty(rlo) && ~isempty(rhi) && numel(rlo)>=nRef && numel(rhi)>=nRef
+                    x = 1:K; y = rmean(pick);
+                    neg = max(0, y - rlo(pick)); pos = max(0, rhi(pick) - y);
+                    errorbar(ax, x, y, neg, pos, 'k', 'LineStyle','none', 'LineWidth', 1.0);
+                end
+                set(ax, 'XTick', 1:K, 'XTickLabel', names(pick), 'XTickLabelRotation', 30);
+                ylabel(ax, 'mean r (CV2)'); title(ax, sprintf('Component-wise mean correlation (Top-%d)%s', K, modLabel));
+                ax.YGrid='on'; ax.Box='on'; ax.FontSize=11;
+                if ~isempty(rlo) && ~isempty(rhi)
+                    set_lim_corr(ax, rmean(pick), rlo(pick), rhi(pick));
+                else
+                    set_lim_corr(ax, rmean(pick));
+                end
+
+                T = table(names(pick), rmean(pick), 'VariableNames',{'Component','MeanR_CV2'});
+                if ~isempty(rlo) && ~isempty(rhi)
+                    T.MeanR_lo95 = rlo(pick); T.MeanR_hi95 = rhi(pick);
+                end
+                if all(isfield(C, {'present_cv2','denom_cv2'}))
+                    T.Presence = arrayfun(@(a,b) sprintf('%d/%d', a, max(1,b)), C.present_cv2(pick), C.denom_cv2(pick), 'uni',0);
+                end
+                set(uitableHandle,'Data', table2cell(T), 'ColumnName', T.Properties.VariableNames, 'RowName',[], 'Visible','on');
+                if isfield(S,'colorbar'), S.colorbar.Visible='off'; end
+                set(ax,'Position',[0.08 0.14 0.62 0.74]);
+
+                S.current.table   = T;
+                S.current.matrix  = table2cell(T);
+                S.current.headers = T.Properties.VariableNames;
+                baseName = sprintf('Component_MeanR_CV2_Top%d', K);
+                if S.isIntermediate, baseName = [baseName '_' sanitizeName(modLabel(4:end))]; end
+                S.current.name    = baseName;
+                setappdata(figHandle,'state',S);
+
+            case 5 % -log10(p) (CV2)
+                if ~isfield(C,'mean_p_cv2') || isempty(C.mean_p_cv2)
+                    showNoData(ax, uitableHandle, 'No component-wise CV2 p-value data'); return;
+                end
+                names = C.names(:);
+                pmean = C.mean_p_cv2(:);
+                plo   = getfield_ifexists(C,'mean_p_lo95');
+                phi   = getfield_ifexists(C,'mean_p_hi95');
+
+                nRef  = numel(pmean);
+                ord   = getOrder(C, safeGet(C,'median_share', pmean));
+                K     = min(getappdata(figHandle,'state').TopK, nRef);
+                pick  = ord(1:K);
+
+                bar(ax, pmean(pick), 'FaceAlpha', 0.9); hold(ax,'on');
+                if ~isempty(plo) && ~isempty(phi) && numel(plo)>=nRef && numel(phi)>=nRef
+                    x = 1:K; y = pmean(pick);
+                    neg = max(0, y - plo(pick)); pos = max(0, phi(pick) - y);
+                    errorbar(ax, x, y, neg, pos, 'k', 'LineStyle','none', 'LineWidth', 1.0);
+                end
+                set(ax, 'XTick', 1:K, 'XTickLabel', names(pick), 'XTickLabelRotation', 30);
+                ylabel(ax, 'mean -log10(p) (CV2)'); title(ax, sprintf('Component-wise mean p (Top-%d)%s', K, modLabel));
+                ax.YGrid='on'; ax.Box='on'; ax.FontSize=11;
+                if ~isempty(plo) && ~isempty(phi)
+                    set_lim_logp(ax, pmean(pick), plo(pick), phi(pick));
+                else
+                    set_lim_logp(ax, pmean(pick));
+                end
+
+                T = table(names(pick), pmean(pick), 'VariableNames',{'Component','MeanP_CV2'});
+                if ~isempty(plo) && ~isempty(phi)
+                    T.MeanP_lo95 = plo(pick); T.MeanP_hi95 = phi(pick);
+                end
+                if all(isfield(C, {'present_cv2','denom_cv2'}))
+                    T.Presence = arrayfun(@(a,b) sprintf('%d/%d', a, max(1,b)), C.present_cv2(pick), C.denom_cv2(pick), 'uni',0);
+                end
+                set(uitableHandle,'Data', table2cell(T), 'ColumnName', T.Properties.VariableNames, 'RowName',[], 'Visible','on');
+                if isfield(S,'colorbar'), S.colorbar.Visible='off'; end
+                set(ax,'Position',[0.08 0.14 0.62 0.74]);
+
+                S.current.table   = T;
+                S.current.matrix  = table2cell(T);
+                S.current.headers = T.Properties.VariableNames;
+                baseName = sprintf('Component_MeanP_CV2_Top%d', K);
+                if S.isIntermediate, baseName = [baseName '_' sanitizeName(modLabel(4:end))]; end
+                S.current.name    = baseName;
+                setappdata(figHandle,'state',S);
         end
 
-        S.current.table   = T;
-        S.current.matrix  = table2cell(T);
-        S.current.headers = T.Properties.VariableNames;
-        S.current.name    = sprintf('Component_MeanR_CV2_Top%d', K);
-        setappdata(figHandle,'state',S);
-
-    case 5 % P values
-        C = R.components;
-        if isempty(C) || ~isfield(C,'mean_p_cv2') || isempty(C.mean_p_cv2)
-            text(0.5,0.5,'No component-wise CV2 p-value data','HorizontalAlignment','center'); axis off;
-            set(uitableHandle,'Visible','off'); return;
-        end
-        names = C.names(:);
-        pmean = C.mean_p_cv2(:);
-        plo   = []; phi = [];
-        if isfield(C,'mean_p_lo95'), plo = C.mean_p_lo95(:); end
-        if isfield(C,'mean_p_hi95'), phi = C.mean_p_hi95(:); end
-    
-        nRef  = numel(pmean);
-        ord = C.order_by_median; if isempty(ord), [~,ord] = sort(C.median_share,'descend','MissingPlacement','last'); end
-        K = min(getappdata(figHandle,'state').TopK, nRef); pick = ord(1:K);
-    
-        bar(ax, pmean(pick), 'FaceAlpha', 0.9); hold(ax,'on');
-        if ~isempty(plo) && ~isempty(phi) && numel(plo)==nRef && numel(phi)==nRef
-            x = 1:K; y = pmean(pick);
-            neg = max(0, y - plo(pick)); pos = max(0, phi(pick) - y);
-            errorbar(ax, x, y, neg, pos, 'k', 'LineStyle','none', 'LineWidth', 1.0);
-        end
-        set(ax, 'XTick', 1:K, 'XTickLabel', names(pick), 'XTickLabelRotation', 30);
-        ylabel(ax, 'mean -log10(p) (CV2)'); title(ax, sprintf('Component-wise mean p (Top-%d)', K));
-        ax.YGrid='on'; ax.Box='on'; ax.FontSize=11;
-        if exist('plo','var') && exist('phi','var') && ~isempty(plo) && ~isempty(phi)
-            set_lim_logp(ax, pmean(pick), plo(pick), phi(pick));
-        else
-            set_lim_logp(ax, pmean(pick));
-        end
-    
-        T = table(names(pick), pmean(pick), 'VariableNames',{'Component','MeanP_CV2'});
-        if ~isempty(plo) && ~isempty(phi)
-            T.MeanP_lo95 = plo(pick); T.MeanP_hi95 = phi(pick);
-        end
-        if isfield(C,'present_cv2') && isfield(C,'denom_cv2')
-            T.Presence = arrayfun(@(a,b) sprintf('%d/%d', a, max(1,b)), C.present_cv2(pick), C.denom_cv2(pick), 'uni',0);
-        end
-        set(uitableHandle,'Data', table2cell(T), 'ColumnName', T.Properties.VariableNames, 'RowName',[], 'Visible','on');
-        if isfield(S,'colorbar'), S.colorbar.Visible='off'; end
-        if strcmp(get(uitableHandle,'Visible'),'off')
-            set(ax,'Position',[0.08 0.14 0.86 0.74]); % wider when no table
-        else
-            set(ax,'Position',[0.08 0.14 0.62 0.74]); % default
-        end
-        S.current.table   = T;
-        S.current.matrix  = table2cell(T);
-        S.current.headers = T.Properties.VariableNames;
-        S.current.name    = sprintf('Component_MeanP_CV2_Top%d', K);
-        setappdata(figHandle,'state',S);
-
-    case 6 % Heat map
+    case 6
         % ===================== Component × Modality =====================
         CM = R.comp_by_mod;
         if isempty(CM) || ~isfield(CM,'median_share') || isempty(CM.median_share)
-            text(0.5,0.5,'No component×modality data','HorizontalAlignment','center'); axis off;
-            set(uitableHandle,'Visible','off');
-            return;
+            showNoData(ax, uitableHandle, 'No component×modality data'); return;
         end
     
-        M = CM.median_share;         % <-- define the matrix in-scope
+        M = CM.median_share;
         compNames = CM.names_comp(:);
         modNames  = CM.names_mod(:);
     
-        hImg = imagesc(M, 'Parent', ax); axis(ax,'tight');
+        imagesc(M, 'Parent', ax); axis(ax,'tight');
         colormap(ax, parula);
         if isfield(S,'colorbar')
             S.colorbar.Visible='off'; 
@@ -354,9 +389,8 @@ switch viewIdx
         set(ax, 'YTick', 1:numel(compNames), 'YTickLabel', compNames);
         xlabel(ax,'Modality'); ylabel(ax,'Component');
         title(ax, sprintf('Component × Modality median share'));
-        set(ax,'Position',[0.18 0.14 0.60 0.74]); % wider when no table
+        set(ax,'Position',[0.18 0.14 0.60 0.74]);
 
-        % Adaptive color scale in [0,1]
         cmax = max(M(:), [], 'omitnan');
         if isfinite(cmax) && cmax > 0
             clim(ax, [0 min(1, cmax*1.02)]);
@@ -366,7 +400,6 @@ switch viewIdx
     
         set(uitableHandle,'Visible','off');
     
-        % Stash for export (numeric matrix is fine)
         T = array2table(M, 'VariableNames', matlab.lang.makeValidName(modNames), ...
                            'RowNames', compNames);
         S.current.table   = T;
@@ -375,23 +408,31 @@ switch viewIdx
         S.current.name    = sprintf('CompByMod_median_h%03d', R.meta.h);
         setappdata(figHandle,'state',S);
 end
+end
 
+function showNoData(ax, uitableHandle, msg)
+    % Keep axes visible so later views don’t inherit 'axis off'
+    cla(ax); set(ax, 'Visible','on'); axis(ax,'on');
+    set(uitableHandle,'Visible','off');
+    % draw a centered note without killing the axes
+    xlim(ax, [0 1]); ylim(ax, [0 1]);
+    text(0.5, 0.5, msg, 'Parent', ax, ...
+        'HorizontalAlignment','center', 'VerticalAlignment','middle', ...
+        'FontAngle','italic', 'Color', [0.2 0.2 0.2]);
+    ax.XTick = []; ax.YTick = []; box(ax,'on');
 end
 
 %% =======================================================================
 function exportCurrent(figHandle, popupView) 
-% Export the current view to XLSX (Windows) or CSV (elsewhere)
 S = getappdata(figHandle, 'state');
 if ~isfield(S,'current') || isempty(S.current)
     warndlg('Nothing to export yet.','Export');
     return;
 end
-
-% sensible default: .xlsx on Windows, else .csv
 defaultExt  = ternary(ispc, '.xlsx', '.csv');
 defaultName = [S.current.name, defaultExt];
 
-[fn, fp, fi] = uiputfile( ...
+[fn, fp, ~] = uiputfile( ...
     {'*.xlsx','Excel Workbook (*.xlsx)'; '*.csv','CSV (comma delimited) (*.csv)'}, ...
     'Export current view', defaultName);
 
@@ -412,7 +453,6 @@ try
             if ~isempty(settingsTable)
                 writetable(settingsTable, fullpath, 'WriteRowNames', false, 'Sheet','Settings');
             end
-    
         case '.csv'
             writetable(T, fullpath, 'WriteRowNames', hasRowNames(T), 'FileType','text','Delimiter',',');
             if ~isempty(settingsTable)
@@ -420,14 +460,9 @@ try
                 fullpath2 = fullfile(fp0, [fn0 '_settings.csv']);
                 writetable(settingsTable, fullpath2, 'WriteRowNames', false, 'FileType','text','Delimiter',',');
             end
-
         otherwise
-            % Fallback: best-effort CSV if user typed a different extension
             fullpath = [fullpath, '.csv'];
-            writetable(T, fullpath, ...
-                'WriteRowNames', hasRowNames(T), ...
-                'FileType', 'text', ...
-                'Delimiter', ',');
+            writetable(T, fullpath, 'WriteRowNames', hasRowNames(T), 'FileType','text','Delimiter',',');
     end
 
     msgbox(sprintf('Exported to:\n%s', fullpath), 'Export successful','help');
@@ -438,11 +473,10 @@ end
 end
 
 function y = ternary(cond, a, b)
-% simple local ternary
 if cond, y = a; else, y = b; end
 end
 
-%% ---------- helpers for export ----------
+%% ---------- helpers ----------
 function tf = hasRowNames(T)
 try
     tf = ~isempty(T.Properties.RowNames);
@@ -452,11 +486,9 @@ end
 end
 
 function T = ensureTable(Tin)
-% Convert cell/data to table if needed; keep row names if present
 if istable(Tin)
     T = Tin;
 else
-    % if it's raw matrix with headers stored separately, coerce to table
     if iscell(Tin)
         T = cell2table(Tin);
     else
@@ -466,11 +498,10 @@ end
 end
 
 function set_lim_share(ax, y, lo, hi)
-% Shares are in [0,1]. Pad upwards by 5% of the max (respecting CI if given).
     if nargin < 3 || isempty(lo) || isempty(hi)
         ymax = max(y, [], 'omitnan');
     else
-        ymax = max(hi, [], 'omitnan');  % use CI upper if available
+        ymax = max(hi, [], 'omitnan');
     end
     if ~isfinite(ymax) || ymax <= 0, ymax = 0.02; end
     ylim(ax, [0, min(1, ymax*1.05)]);
@@ -480,7 +511,6 @@ function set_lim_share(ax, y, lo, hi)
 end
 
 function set_lim_corr(ax, y, lo, hi)
-% Correlations are in [-1,1]. Pad by 5% of span but clamp to [-1,1].
     yall = y(:);
     if nargin >= 3 && ~isempty(lo) && ~isempty(hi)
         yall = [yall; lo(:); hi(:)];
@@ -496,7 +526,6 @@ function set_lim_corr(ax, y, lo, hi)
 end
 
 function set_lim_logp(ax, y, lo, hi)
-% y (and optional lo/hi) are on the -log10 scale, i.e., unbounded above and >= 0.
     yall = y(:);
     if nargin >= 3 && ~isempty(lo) && ~isempty(hi)
         yall = [yall; lo(:); hi(:)];
@@ -512,50 +541,7 @@ function set_lim_logp(ax, y, lo, hi)
     ax.YAxis.TickLabelsMode= 'auto';
 end
 
-function showSettingsDialog(figHandle)
-S = getappdata(figHandle,'state');
-if ~isfield(S,'R') || ~isfield(S.R,'meta') || ~isfield(S.R.meta,'settings') || isempty(S.R.meta.settings)
-    warndlg('No settings found in R.meta.settings.','Settings');
-    return;
-end
-
-T = settings_as_table(S.R.meta.settings);
-
-% Build a small modal dialog
-d = dialog('Name','Backprojection & Alignment Settings','Units','normalized', ...
-           'Position',[0.32 0.32 0.36 0.36], 'Color','w');
-[Data, ColNames] = table_to_uitable_data(T);
-
-uit = uitable('Parent',d,'Units','normalized','Position',[0.05 0.18 0.90 0.77], ...
-    'Data', Data, 'ColumnName', ColNames, ...
-    'RowName',[], 'ColumnEditable', false(1,width(T)));
-
-nCols = numel(ColNames);
-set(uit, 'ColumnWidth', repmat({'auto'}, 1, nCols));  
-
-uicontrol('Parent',d,'Style','pushbutton','String','Copy as text', ...
-    'Units','normalized','Position',[0.05 0.05 0.28 0.09], ...
-    'Callback', @(~,~) copySettingsToClipboard(T));
-
-uicontrol('Parent',d,'Style','pushbutton','String','Close', ...
-    'Units','normalized','Position',[0.67 0.05 0.28 0.09], ...
-    'Callback', @(~,~) close(d));
-end
-
-function copySettingsToClipboard(T)
-% Turn the table into nicely formatted "Name: Value" lines.
-lines = strcat(T.Parameter, ": ", T.Value);
-str = strjoin(lines, newline);
-try
-    clipboard('copy', str);
-    msgbox('Settings copied to clipboard.','Copied','help');
-catch ME
-    errordlg(['Copy failed: ' ME.message],'Copy error');
-end
-end
-
 function T = settings_as_table(Sin)
-% Map internal field names to friendly labels + descriptions
 nameMap = struct( ...
   'backprojection_method',       {{'Backprojection method', 'How component weights are projected back to feature space'}}, ...
   'similarity_alignment_method', {{'Similarity metric (alignment)', 'Metric used when aligning components (e.g., correlation type)'}}, ...
@@ -572,7 +558,7 @@ for i = 1:numel(params)
     val = Sin.(fn);
 
     if isfield(nameMap, fn)
-        c  = nameMap.(fn);        % <-- pull the cell array out first
+        c  = nameMap.(fn);
         nm = c{1};
         ds = c{2};
     else
@@ -588,9 +574,7 @@ end
 T = table(P, V, D, 'VariableNames', {'Parameter','Value','Description'});
 end
 
-
 function s = stringifyValue(v)
-% Short, readable values for numbers/strings/logicals/arrays
 if isstring(v) || ischar(v)
     s = string(v);
 elseif islogical(v) && isscalar(v)
@@ -613,41 +597,104 @@ end
 end
 
 function [C, colnames] = table_to_uitable_data(T)
-% Convert a table to a cell array where each element is numeric/logical/char.
-
-    C = table2cell(T);
-    for r = 1:size(C,1)
-        for c = 1:size(C,2)
-            v = C{r,c};
-
-            if isstring(v)                 % string -> char
-                C{r,c} = char(v);
-            elseif ischar(v)               % ok
-                % no-op
-            elseif isnumeric(v) || islogical(v)
-                if isscalar(v)
-                    % ok
-                else
-                    % non-scalar numeric/logical -> summarize as char
-                    C{r,c} = char(strjoin(string(v(:).'), ' '));
-                end
-            elseif isdatetime(v)
-                C{r,c} = datestr(v);
-            elseif iscell(v)               % cell -> char summary
-                try
-                    C{r,c} = char(strjoin(string(v), ', '));
-                catch
-                    C{r,c} = '<cell>';
-                end
-            else                            % anything else -> char via json or fallback
-                try
-                    C{r,c} = char(jsonencode(v));
-                catch
-                    C{r,c} = '<unprintable>';
-                end
+C = table2cell(T);
+for r = 1:size(C,1)
+    for c = 1:size(C,2)
+        v = C{r,c};
+        if isstring(v)
+            C{r,c} = char(v);
+        elseif ischar(v)
+            % ok
+        elseif isnumeric(v) || islogical(v)
+            if isscalar(v)
+            else
+                C{r,c} = char(strjoin(string(v(:).'), ' '));
+            end
+        elseif isdatetime(v)
+            C{r,c} = datestr(v);
+        elseif iscell(v)
+            try
+                C{r,c} = char(strjoin(string(v), ', '));
+            catch
+                C{r,c} = '<cell>';
+            end
+        else
+            try
+                C{r,c} = char(jsonencode(v));
+            catch
+                C{r,c} = '<unprintable>';
             end
         end
     end
+end
+colnames = cellstr(T.Properties.VariableNames);
+end
 
-    colnames = cellstr(T.Properties.VariableNames);
+%%% --------------------- utilities for intermediate fusion ---------------------
+function names = getDRModNames(R)
+% Try to map component cells to modality names. Prefer explicit list if present.
+if isfield(R,'components_mod_names') && ~isempty(R.components_mod_names)
+    names = cellstr(string(R.components_mod_names));
+    return;
+end
+% Fallback: if R.modality.names exists, assume DR-based modalities keep order in a subset list
+if isfield(R,'modality') && isfield(R.modality,'names') && ~isempty(R.modality.names)
+    Mnames = cellstr(string(R.modality.names));
+    % If counts match exactly, assume 1:1 order
+    if numel(Mnames) == numel(R.components)
+        names = Mnames;
+        return;
+    end
+end
+% Last resort: numbered
+names = compose("Mod%02d", 1:numel(R.components));
+end
+
+function v = getfield_ifexists(S, fn)
+if isfield(S, fn), v = S.(fn)(:); else, v = []; end
+end
+
+function out = safeGet(S, fn, defaultV)
+if isfield(S, fn) && ~isempty(S.(fn))
+    out = S.(fn)(:);
+else
+    out = defaultV(:);
+end
+end
+
+function ord = getOrder(C, fallbackVec)
+if isfield(C,'order_by_median') && ~isempty(C.order_by_median)
+    ord = C.order_by_median(:);
+else
+    [~,ord] = sort(fallbackVec(:),'descend','MissingPlacement','last');
+end
+end
+
+function s = safePick(cellOrArray, idx)
+% pick idx from cellstr/strings or numeric arrays safely
+try
+    if iscell(cellOrArray)
+        s = cellOrArray{idx};
+    elseif isstring(cellOrArray)
+        s = char(cellOrArray(idx));
+    else
+        s = cellOrArray(idx);
+    end
+catch
+    s = '';
+end
+if isstring(s), s = char(s); end
+end
+
+function v = safePickVec(vIn, pick)
+try
+    v = vIn(pick);
+catch
+    v = nan(numel(pick),1);
+end
+end
+
+function nm = sanitizeName(s)
+if isempty(s), nm = 'mod'; return; end
+nm = regexprep(s, '[^\w\-]+', '_');
 end

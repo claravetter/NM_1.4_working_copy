@@ -47,12 +47,12 @@ function [I, I1, Tx, Psel, Rx, SRx, PAx, assignmentVec, signCorrections] = ...
             haveRef = isfield(I,'VCV1REF') && numel(I.VCV1REF) >= h && numel(I.VCV1REF{h}) >=n && ~isempty(I.VCV1REF{h}{n});
             % Ensure the cached ref cell exists and is length nM (placeholders for inactive)
             if ~haveRef, I.VCV1REF{h}{n} = {[]}; end
-            [I1, Tx{n}, ~, assignmentVec{n}, signCorrections{n}, I.VCV1REF{h}{n}] = nk_VisXRealignComponentsHelper(I1, inp, haveRef, Tx{n}, I.VCV1REF{h}{n}, nM, il, ill, n, h, Fadd, Vind, nonZeroMasks);
+            [I1, Tx{n}, ~, assignmentVec{n}, signCorrections{n}, I.VCV1REF{h}{n}] = nk_VisXRealignComponentsHelper(I1, inp, haveRef, Tx{n}, I.VCV1REF{h}{n}, nM, il, ill, n, h, Fadd, Vind);
         end
     else
         haveRef = isfield(I,'VCV1REF') && numel(I.VCV1REF) >= h && ~isempty(I.VCV1REF{h});    
         if ~haveRef, I.VCV1REF{h} = []; end
-        [I1, Tx, ~, assignmentVec, signCorrections, I.VCV1REF{h}] = nk_VisXRealignComponentsHelper(I1, inp, haveRef, Tx, I.VCV1REF{h}, nM, il, ill, [], h, Fadd, Vind, nonZeroMasks);
+        [I1, Tx, ~, assignmentVec, signCorrections, I.VCV1REF{h}] = nk_VisXRealignComponentsHelper(I1, inp, haveRef, Tx, I.VCV1REF{h}, nM, il, ill, [], h, Fadd, Vind);
     end
 
 end

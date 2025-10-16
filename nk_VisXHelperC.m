@@ -228,7 +228,7 @@ switch act
                     nBefore = size(I2.VCV2WPERMREF{h}{n}, 1);
                     minFolds = round(inp.SelCompCutOff * size(I2.VCV2WPERMREF{h}{n},2));
                     pres     = sum(~isnan(I2.VCV2WPERMREF{h}{n}),2);
-                    keep{n}     = pres >= minFolds;
+                    keep{n}  = pres >= minFolds;
                      % how many after?
                     if ~any(keep{n})
                        [~, sortedIdx] = sort(pres, 'descend');
@@ -271,11 +271,14 @@ switch act
                 end
                 keep = repmat({keep},nM,1);
             end
-
             for n = 1:nM
                 if decompfl(n)
                     % 1) prune the reference‐space weights
-                    I2.VCV1REF{h,n}       = I2.VCV1REF{h,n}      (:, keep{n});
+                    if inp.isInter
+                        I2.VCV1REF{h}{n}       = I2.VCV1REF{h}{n}      (:, keep{n});
+                    else
+                        I2.VCV1REF{h}{1}       = I2.VCV1REF{h}{1}      (:, keep{n});
+                    end
                     % 2) prune the CV2‐aggregates
                     % The 2D accumulators:
                     I2.VCV2SUM{h,n}       = I2.VCV2SUM{h,n}      (:, keep{n});
@@ -295,30 +298,29 @@ switch act
                     I2.VCV2MEAN{h,n}      = I2.VCV2MEAN{h,n}     (:, :, keep{n});
                 end
             end
-            if compwise 
-                if inp.isInter
-                    for n=1:nM
-                        if ~inp.decompfl(n), continue; end
-                        % 2a) prune the CV2‐aggregates in intermediate fusion
-                        % mode
-                        I2.VCV2WPERMREF{h}{n} = I2.VCV2WPERMREF{h}{n}(keep{n},:);
-                        I2.VCV2WCORRREF{h}{n} = I2.VCV2WCORRREF{h}{n}(keep{n},:);
-                        I2.ModComp_L2n{h}{n} = I2.ModComp_L2n{h}(keep{n},:);
-                        if isfield(I2,'VCV1ENTRY') && numel(I2.VCV1ENTRY) >= h && numel(I2.VCV1ENTRY{h}) <=n && ~isempty(I2.VCV1ENTRY{h}{n})
-                            I2.VCV1ENTRY{h}{n} = I2.VCV1ENTRY{h}{n}(keep{n});
-                        end
-                    end
-                else
-                    % 2b) prune the CV2‐aggregates in early fusion mode
-                    I2.VCV2WPERMREF{h} = I2.VCV2WPERMREF{h}(keep{1},:);
-                    I2.VCV2WCORRREF{h} = I2.VCV2WCORRREF{h}(keep{1},:);
-                    I2.ModComp_L2n{h} = I2.ModComp_L2n{h}(keep{1},:);
-                    I2.ModComp_L2nCube{h} = I2.ModComp_L2nCube{h}(keep{1},:,:);
-                    if isfield(I2,'VCV1ENTRY') && numel(I2.VCV1ENTRY) >= h && ~isempty(I2.VCV1ENTRY{h})
-                        I2.VCV1ENTRY{h} = I2.VCV1ENTRY{h}(keep{1});
+            if inp.isInter
+                for n=1:nM
+                    if ~inp.decompfl(n), continue; end
+                    % 2a) prune the CV2‐aggregates in intermediate fusion
+                    % mode
+                    I2.VCV2WPERMREF{h}{n} = I2.VCV2WPERMREF{h}{n}(keep{n},:);
+                    I2.VCV2WCORRREF{h}{n} = I2.VCV2WCORRREF{h}{n}(keep{n},:);
+                    I2.ModComp_L2n{h}{n} = I2.ModComp_L2n{h}{n}(keep{n},:);
+                    if isfield(I2,'VCV1ENTRY') && numel(I2.VCV1ENTRY) >= h && numel(I2.VCV1ENTRY{h}) >=n && ~isempty(I2.VCV1ENTRY{h}{n})
+                        I2.VCV1ENTRY{h}{n} = I2.VCV1ENTRY{h}{n}(keep{n});
                     end
                 end
+            else
+                % 2b) prune the CV2‐aggregates in early fusion mode
+                I2.VCV2WPERMREF{h} = I2.VCV2WPERMREF{h}(keep{1},:);
+                I2.VCV2WCORRREF{h} = I2.VCV2WCORRREF{h}(keep{1},:);
+                I2.ModComp_L2n{h} = I2.ModComp_L2n{h}(keep{1},:);
+                if nM>1,I2.ModComp_L2nCube{h} = I2.ModComp_L2nCube{h}(keep{1},:,:); end
+                if isfield(I2,'VCV1ENTRY') && numel(I2.VCV1ENTRY) >= h && ~isempty(I2.VCV1ENTRY{h})
+                    I2.VCV1ENTRY{h} = I2.VCV1ENTRY{h}(keep{1});
+                end
             end
+            
         end
 
     case 'prune'
@@ -466,7 +468,6 @@ switch act
         fprintf('\nRealigning compact component space to reference space.'); 
         
         for h = 1:nclass
-
             if ~exist('ill','var')
                 if inp.isInter
                     ill = size(I1.VCV1WPERMREF{h}{1},2);
@@ -477,6 +478,7 @@ switch act
         
             % --- fusion mode ---
             actMods  = find(inp.decompfl~=0).';
+            if numel(actMods)>1 && size(actMods,2)==1, actMods = actMods'; end
             if isempty(actMods), return; end
         
             % --- gather shapes ---
@@ -502,8 +504,12 @@ switch act
                 % 1) Build per-modality source cells (prune empty/NaN cols)
                 src_cells   = cell(1,nM);
                 validCols   = cell(1,nM);
-                for n = actMods
-                    X = reshape(I1.VCV1{h,n}(:, f, :), size(I1.VCV1{h,n},1), []);
+                for n = 1:nM
+                    if size(I1.VCV1{h,n},3) >0
+                        X = reshape(I1.VCV1{h,n}(:, f, :), size(I1.VCV1{h,n},1), []);
+                    else
+                        X = I1.VCV1{h,n}(:,f);
+                    end
                     vc = any(isfinite(X) & X ~= 0, 1);
                     validCols{n} = vc;
                     src_cells{n} = X(:, vc);
@@ -523,7 +529,7 @@ switch act
         
                     haveRef = any(~cellfun(@isempty, Ref_in));
         
-                    [I1, Tx_out, ~, assignmentVec, ~, Ref_out] = nk_VisXRealignComponentsHelper( I1, inp, haveRef, Tx_in, Ref_in, nM, f, ill, [], h, I1.Fadd{h,f}, I1.Vind{h,f}, nonZeroMasks);
+                    [I1, Tx_out, ~, assignmentVec, ~, Ref_out] = nk_VisXRealignComponentsHelper( I1, inp, haveRef, Tx_in, Ref_in, nM, f, ill, [], h, I1.Fadd{h,f}, I1.Vind{h,f});
         
                     % --- detect growth & persist ---
                     nRef_old = 0;
@@ -594,7 +600,7 @@ switch act
                         Tx_in  = src_cells{n};             % 1x1 cell
                         haveRef_n = ~isempty(Ref_in);
         
-                        [I1, Tx_out, ~, aVec_n, ~, Ref_out] = nk_VisXRealignComponentsHelper(I1, inp, haveRef_n, Tx_in, Ref_in, nM, f, ill, n, h, I1.Fadd{h,f}, I1.Vind{h,f}, nonZeroMasks);
+                        [I1, Tx_out, ~, aVec_n, ~, Ref_out] = nk_VisXRealignComponentsHelper(I1, inp, haveRef_n, Tx_in, Ref_in, nM, f, ill, n, h, I1.Fadd{h,f}, I1.Vind{h,f});
         
                         % --- detect growth & persist (per modality) ---
                         nRef_old = 0;
@@ -1056,7 +1062,7 @@ switch act
                 % rank by median share
                 [~, ord] = sort(medShare, 'descend', 'MissingPlacement','last');
         
-                fprintf('\n[nk_VisModels] L2n share report — modality-wise (h=%d, CV1 folds=%d)\n', h, ill_loc);
+                fprintf('\n[nk_VisModels] L_p share report — modality-wise (h=%d, CV1 folds=%d)\n', h, ill_loc);
                 fprintf('   %-20s  %8s  %8s  %7s\n', 'Modality', 'Median', 'Mean', 'Covg');
                 for r = 1:numel(ord)
                     m = ord(r);
@@ -1621,6 +1627,7 @@ switch act
                         cpf_all = I2.VCV2NMODEL_PERFOLD{h}(:)';                  
                         cpf     = cpf_all(1:min(ll, numel(cpf_all)));            
                     end
+                    R.components_idxs = actMods;
         
                     for n = actMods
                         Cmag = [];
