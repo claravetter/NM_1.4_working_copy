@@ -9,6 +9,7 @@ h_list          = get(handles.selModelMeasures,'String');
 h_val           = get(handles.selModelMeasures,'Value');
 h_onevsall_val  = get(handles.selOneVsAll_Info,'Value');
 if ~exist('groupnames','var') || isempty(groupnames), groupnames = handles.NM.groupnames; end
+if h_val>numel(h_list), h_val=1; end
 switch h_list{h_val}
     case 'Classification plot'
         if strcmpi(h_classlist{h_class},'Multi-group classifier')

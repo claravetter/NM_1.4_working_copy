@@ -944,7 +944,7 @@ function selModal_Callback(hObject, eventdata, handles)
 
 % Hints: contents = cellstr(get(hObject,'String')) returns selModal contents as cell array
 %        contents{get(hObject,'Value')} returns selected item from selModal
-
+if strcmp(hObject.String(hObject.Value),'Bagged predictor'), handles.curmodal = hObject.Value-1; end
 handles = perf_display(handles);
 guidata(handles.figure1,handles);
 

@@ -9,5 +9,6 @@ for i = 1:nM
     end
     popuplist{i} = sprintf('Modality #%g: %s', i, desc);
 end
+handles.selModal.String = popuplist;
 
 

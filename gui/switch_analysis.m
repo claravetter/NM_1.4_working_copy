@@ -2,7 +2,14 @@ function [handles, visdata, oocvdata, mlidata] = switch_analysis(handles)
 
 visdata = []; oocvdata = []; mlidata = [];
 analind = handles.curranal;
-handles.curmodal = 1; if strcmp(handles.selModal.Enable,'on'), handles.curmodal = handles.selModal.Value; end
+handles.curmodal = 1; 
+if strcmp(handles.selModal.Enable,'on')
+    if strcmp(handles.selModal.String(handles.selModal.Value),'Bagged predictor')
+        handles.curmodal = handles.selModal.Value-1; 
+    else
+        handles.curmodal = handles.selModal.Value; 
+    end
+end
 
 if handles.multi_modal && strcmp(handles.selModal.String{handles.selModal.Value},'Bagged predictor')
     GDdims = handles.NM.analysis{analind}.META; handles.METAstr = 'bagged';

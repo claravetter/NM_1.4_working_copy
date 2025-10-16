@@ -189,7 +189,15 @@ if ~isempty(analysis)
     % Check if at least one modality is processed without a dimensionality 
     % reduction method. If so, allow user to modify the memory mode and
     % thus compute correlation matrices and derived metrics
-    PREPROCs = analysis.params.TrainParam.PREPROC(analysis.params.TrainParam.FUSION.M);
+    switch analysis.params.TrainParam.FUSION.flag
+        case {0,1,2}
+            PREPROCs = analysis.params.TrainParam.PREPROC(analysis.params.TrainParam.FUSION.M);
+        case 3
+            nM = numel(analysis.params.TrainParam.FUSION.M); PREPROCs = cell(1,nM);
+            for n=1:nM
+                PREPROCs{n} = analysis.params.TrainParam.STRAT{analysis.params.TrainParam.FUSION.M(n)}.PREPROC;
+            end
+    end
     inp.decompfl = false(1,numel(PREPROCs));
     for i=1:numel(PREPROCs)
         inp.decompfl(i) = nk_DetIfDimRefInPREPROC(PREPROCs{i}, i);
@@ -417,7 +425,15 @@ F = analysis.params.TrainParam.FUSION.M;
 nF = numel(F); if FUSION.flag < 3, nF = 1; end
 
 % Create final decompfl boolean array
-PREPROCs = analysis.params.TrainParam.PREPROC(analysis.params.TrainParam.FUSION.M);
+switch analysis.params.TrainParam.FUSION.flag
+    case {0,1,2}
+        PREPROCs = analysis.params.TrainParam.PREPROC(analysis.params.TrainParam.FUSION.M);
+    case 3
+        nM = numel(analysis.params.TrainParam.FUSION.M); PREPROCs = cell(1,nM);
+        for n=1:nM
+            PREPROCs{n} = analysis.params.TrainParam.STRAT{analysis.params.TrainParam.FUSION.M(n)}.PREPROC;
+        end
+end
 inp1.decompfl = false(1, numel(PREPROCs));
 for i=1:numel(PREPROCs)
     inp1.decompfl(i) = nk_DetIfDimRefInPREPROC(PREPROCs{i}, i);

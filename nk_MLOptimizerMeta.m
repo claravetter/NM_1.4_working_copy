@@ -1,9 +1,11 @@
 function [ METAres, IN ] = nk_MLOptimizerMeta( analysis, IN )
 
-global FUSION META MODEFL 
+global FUSION META MODEFL MULTILABEL
 
 GDdims = analysis.GDdims;
 aggmode = 1; METAres = [];
+[nl, lsel]      = nk_GetLabelDim(MULTILABEL); % Multi-label mode?
+labels = IN.labels(:,lsel);
 % Perform 2nd-level learning
 if FUSION.flag == 3 && ~isempty(META)
     switch META.flag 
@@ -36,7 +38,7 @@ if FUSION.flag == 3 && ~isempty(META)
                     % Here we aggregate only the median predictions for
                     % each case. That is the bagged predictor
                     for curclass=1:IN.nclass
-                        P{curclass} = zeros(numel(IN.labels),nG);
+                        P{curclass} = zeros(numel(labels),nG);
                         for n=1:nG
                             nGDdims = GDdims{ind0(n)};
                             switch MODEFL
@@ -57,7 +59,7 @@ if FUSION.flag == 3 && ~isempty(META)
                                 if n==1
                                     mP                 = nGDdims.multi_predictions;
                                 else
-                                    mP                 = arrayfun( @(i) cellmat_mergecols(mP(i), nGDdims.multi_predictions(i)),1:size(IN.labels,1))';
+                                    mP                 = arrayfun( @(i) cellmat_mergecols(mP(i), nGDdims.multi_predictions(i)),1:size(labels,1))';
                                 end
                                 best_MultiCVperf(n)         = nGDdims.best_MultiCVperf;
                                 best_MultiTSperf(n)         = nGDdims.best_MultiTSperf;
@@ -85,24 +87,24 @@ if FUSION.flag == 3 && ~isempty(META)
     switch MODEFL
         case 'classification'
             lu = [1 -1];
-            L = nan(numel(IN.labels),IN.nclass);
+            L = nan(numel(labels),IN.nclass);
             for curclass=1:IN.nclass
                 cvu = analysis.params.cv.class{1,1}{curclass};
                 for y = 1:numel(cvu.groups)
-                    indy = IN.labels == cvu.groups(y); L(indy,curclass) = lu(y);
+                    indy = labels == cvu.groups(y); L(indy,curclass) = lu(y);
                 end
-                if y==1, indy = IN.labels ~= cvu.groups(y);L(indy,curclass) = lu(y); end
+                if y==1, indy = labels ~= cvu.groups(y);L(indy,curclass) = lu(y); end
                 METAres.BinClass{curclass} = nk_ComputeEnsembleProbability(P{curclass}, L(:,curclass));
                 best_TSperf_multimodal(curclass) = METAres.BinClass{curclass}.costfun_crit;
             end
             % Multi-group data available?
             if exist('mP','var')
-                METAres = nk_MultiPerfComp(METAres, mP, IN.labels, IN.ngroups);
+                METAres = nk_MultiPerfComp(METAres, mP, labels, IN.ngroups);
                 METAres.best_MultiCVperf_unimodal = best_MultiCVperf;
                 METAres.best_MultiTSperf_unimodal = best_MultiTSperf;
             end
         case 'regression'
-            L = IN.labels; 
+            L = labels; 
             METAres.Regr = nk_ComputeEnsembleProbability( P{1}, L , 1);
             METAres.r = R;
             METAres.t = T;
