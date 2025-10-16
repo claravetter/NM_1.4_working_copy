@@ -674,7 +674,7 @@ for f=1:ix % Loop through CV2 permutations
                                 % input-space or model-space level
                                 % permutation operations
                                 if permfl || sigfl
-                                    indperm = []; indpermfeat = [];
+                                    indpermfeat = [];
                                     switch MODEFL
                                         case 'classification'
                                             pTrInd = CV.TrainInd{f,d}(CV.class{f,d}{h}.TrainInd{k,l}); 
@@ -734,10 +734,12 @@ for f=1:ix % Loop through CV2 permutations
                                         end
                                     end
                                     
-                                    fprintf('\n\t%3g | OptModel =>', u);
-                                    [perf_orig, I1.TS{h}(:,il(h)), I1.DS{h}(:,il(h))] = nk_GetTestPerf(modelTs, modelTsL, Find, MD{h}{m}{k,l}{u}, modelTr); 
-                                    fprintf(' %1.2f',perf_orig)
-                                      
+                                    if permfl || sigfl
+                                        fprintf('\n\t%3g | OptModel =>', u);
+                                        [perf_orig, I1.TS{h}(:,il(h)), I1.DS{h}(:,il(h))] = nk_GetTestPerf(modelTs, modelTsL, Find, MD{h}{m}{k,l}{u}, modelTr); 
+                                        fprintf(' %1.2f',perf_orig)
+                                    end
+
                                     if sigfl % Permutations in model space
                                         
                                         if inp.multiflag

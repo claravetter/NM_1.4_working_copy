@@ -1355,7 +1355,11 @@ switch act
         end
         
     case 'report_final'
-      
+        
+        % Nothing to report if there is only one modality and no
+        % back-projection activated
+        if nM==1 && ~compwise, return; end
+
         for h = 1:nclass
 
             R = struct();
