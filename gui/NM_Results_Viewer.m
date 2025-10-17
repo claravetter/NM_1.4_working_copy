@@ -52,7 +52,7 @@ function NM_Results_Viewer_OpeningFcn(hObject, ~, handles, varargin)
 % handles    structure with handles and user data (see GUIDATA)
 % varargin   command line arguments to NM_Results_Viewer (see VARARGIN)
 
- % 1) Give main figure a unique Tag
+ % 1) Give main figure a unique Tag 
 myTag = 'NM_ResultsViewer';
 set(hObject,'Tag', myTag);
 
@@ -86,35 +86,48 @@ end
 
 set(hObject,'Visible','off');         % hide whole UI
 
+
 NM = []; analind = 1;
 handles.analind = analind;
 
 % Choose default command line output for NM_Results_Viewer
 handles.output = hObject;
 
-% --- Manual GUI Sizing ---
-% Define your desired GUI size in pixels
-manual_width = 1400;
-manual_height = 800;
-
-% Get screen size just to center the window
+% Get screen size once, as it's used in both scenarios
 sz = get(0, 'ScreenSize');
-screen_width = sz(3);
-screen_height = sz(4);
-
-% Calculate the bottom-left (x, y) coordinates to center the figure
-pos_x = max( (screen_width - manual_width) / 2, 1);
-pos_y = max( (screen_height - manual_height) / 2, 1);
-fig_pos = [pos_x, pos_y, manual_width, manual_height];
-
-% Set the new position and units
-set(hObject, 'Units', 'pixels', ...
-             'Position', fig_pos, ...
-             'WindowButtonMotionFcn', @hoverCallback, ...
-             'WindowButtonDownFcn', @clickCallback);
-
-% Store the actual screen size for other potential uses (like font scaling)
 handles.screensize = sz(3:4);
+
+% --- Conditional GUI Sizing based on environment ---
+% Check the specific environment variable confirmed from your getenv() output.
+isMatlabOnline = strcmp(getenv('MW_DDUX_APP_NAME'), 'MATLAB_ONLINE');
+
+if isMatlabOnline % to fix sizing issues in Matlab Online
+    % --- MATLAB Online Logic (Manual Sizing) ---
+    % Use fixed pixel dimensions because automatic scaling is unreliable online.
+    manual_width = 1400;
+    manual_height = 800;
+
+    % Center the fixed-size window on the screen
+    screen_width = sz(3);
+    screen_height = sz(4);
+    pos_x = max( (screen_width - manual_width) / 2, 1);
+    pos_y = max( (screen_height - manual_height) / 2, 1);
+    fig_pos = [pos_x, pos_y, manual_width, manual_height];
+
+    % Set the position using pixels
+    set(hObject, 'Units', 'pixels', ...
+                 'Position', fig_pos, ...
+                 'WindowButtonMotionFcn', @hoverCallback, ...
+                 'WindowButtonDownFcn', @clickCallback);
+else
+    % --- Desktop MATLAB Logic (Automatic Sizing) ---
+    % Use the original, reliable method for desktop versions.
+    set(hObject, 'WindowButtonMotionFcn', @hoverCallback, ...
+                 'WindowButtonDownFcn', @clickCallback, ...
+                 'Units','Normalized','Outerposition',[0 0 0.9 0.9]);
+end
+
+ax = handle(handles.axes1);
 
 ax = handle(handles.axes1);
 ax.YAxis.FontSize=10;
@@ -157,7 +170,7 @@ handles.axes1pos_alt        = [ 0.05807522123893805 ...
                                 0.36 ...
                                 0.475 ];
 
-set(handles.axes1,'Position', handles.axes1pos_orig);
+set(handles.axes1,'Position', handles.axes1pos_orig);                            
 set(handles.axes1, 'FontUnits','normalized','FontSize', 0.03, ...
             'FontWeight', handles.AxisTickWeight, ...
             'LineWidth', handles.AxisLineWidth);
@@ -173,7 +186,7 @@ set(handles.axes4,...
             'FontWeight', handles.PieAxisTickWeight);
 set(handles.axes17, 'FontUnits','normalized','FontSize', 0.03, ...
             'FontWeight', handles.AxisTickWeight, ...
-            'LineWidth', handles.AxisLineWidth);
+            'LineWidth', handles.AxisLineWidth); 
         
 %% Load analysis
 if handles.screensize(1) < 800
@@ -207,9 +220,9 @@ for k = 1:numel(stdTags)
 end
 
 % Read-in NM structure
-if isempty(NM)
-    try
-        NM = evalin('base', 'NM');
+if isempty(NM) 
+    try 
+        NM = evalin('base', 'NM'); 
     catch
         errordlg('No NM structure found in MATLAB workspace!')
     end
@@ -581,7 +594,7 @@ function clickCallback(src, evt)
         if abs(mouseX - figdata.x(indpat)) < 0.035*xrange && abs(mouseY - figdata.y(indpat)) < 0.035*yrange
             x1 = figdata.x(indpat);
             y1 = figdata.y(indpat);
-            axes(handles.axes1);
+            axes(handles.axes1); 
             if isfield(figdata,'cases')
                 selCase = figdata.cases{indpat};
                 if isfield(handles,'caseplot'), delete(handles.caseplot); end
@@ -595,7 +608,7 @@ function clickCallback(src, evt)
                     if ~isnumeric(handles.MLIapp) && isvalid(handles.MLIapp)
                         updateFcn(handles.MLIapp, handles)
                     end
-                else
+                else 
                     handles.thisMLIresult.Visible = 'off';
                 end
                 if isfield(figdata,'cases'), axesHdl.Legend.String{end} = selCase; end
@@ -1059,7 +1072,7 @@ if ~exist('pos','var')
 end
 
 h_new = copyobj(obj,targ);
-h_new(1).Position = pos;
+h_new(1).Position = pos; 
 h_new(1).Title.String = titl;
 
 % --- Executes on button press in cmdExportAxes2.
@@ -1239,7 +1252,7 @@ I = find(~cellfun(@isempty,strfind(AxesData.cases,selCaseX)));
 x1 = AxesData.x(I);
 y1 = AxesData.y(I);
 figpos = dsxy2figxy(handles.axes1,x1,y1);
-axes(handles.axes1);
+axes(handles.axes1); 
 %[figx,figy] = dsxy2figxy(handles.axes1,[x1 y1],[x2 y2]);
 if isfield(handles,'caseplot'), delete(handles.caseplot); end
 handles.caseplot = plot(x1,y1,'ko','MarkerSize',20, 'LineWidth',1.5);
@@ -1250,7 +1263,7 @@ if isfield(handles, 'MLIdata') && ~isempty(handles.MLIdata)
     if ~isnumeric(handles.MLIapp) && isvalid(handles.MLIapp)
         updateFcn(handles.MLIapp, handles)
     end
-else
+else 
     handles.thisMLIresult.Visible = 'off';
 end
 % if strcmp(handles.axes1.Legend.Interpreter,'latex')
@@ -1326,7 +1339,7 @@ if strcmp(hObject.Tag,'All')
         try
             analind = i;
             handles.curranal = analind;
-            handles = switch_analysis(handles);
+            handles = switch_analysis(handles); 
             fprintf('\nProcessing analysis %g [ ID: %s ]',i, handles.NM.analysis{i}.id);
             feval(ExportFunc,handles,1);
             handles.curranal = curranal;  handles = switch_analysis(handles);
@@ -1340,7 +1353,7 @@ else
     if analind ~= handles.curranal
         curranal = handles.curranal;
         handles.curranal = analind;
-        handles = switch_analysis(handles);
+        handles = switch_analysis(handles); 
     end
     fprintf('\nProcessing analysis %g [ ID: %s ]',analind, handles.NM.analysis{analind}.id);
     feval(ExportFunc,handles,1);
@@ -1348,7 +1361,7 @@ else
         handles.curranal = curranal;  handles = switch_analysis(handles);
     end
     guidata(handles.figure1,handles);
-end
+end   
 
 % --------------------------------------------------------------------
 function CompModels_Callback(hObject, eventdata, handles)
@@ -1531,7 +1544,7 @@ function thisMLIresult_Callback(hObject, eventdata, handles)
         if isnumeric(handles.MLIapp)
             handles.MLIapp = appMLI(handles);
         elseif ~isvalid(handles.MLIapp)
-            handles.MLIapp.delete;
+            handles.MLIapp.delete; 
             handles.MLIapp  = appMLI(handles);
         elseif ~isnumeric(handles.MLIapp) && isvalid(handles.MLIapp)
             updateFcn(handles.MLIapp, handles);
@@ -1584,7 +1597,7 @@ function selSubGroupOOCV_Callback(hObject, eventdata, handles)
 g_oocvind = handles.OOCVinfo.Analyses{handles.curranal}.OOCVvec(oocvind);
 if hObject.Value > 1
     gindex = hObject.Value-1; gIdx = gindex; refgroup_flag = false;
-    if isfield(handles.NM.OOCV{g_oocvind},'refgroup')
+    if isfield(handles.NM.OOCV{g_oocvind},'refgroup') 
         if gindex >= handles.NM.OOCV{g_oocvind}.refgroup, gindex = gindex + 1; end
         refgroup_flag = true;
     end
@@ -1614,7 +1627,7 @@ if hObject.Value > 1
             end
     end
 else
-    if isfield(handles,'SubIndex')
+    if isfield(handles,'SubIndex') 
         handles = rmfield(handles,'SubIndex');
     end
     switch handles.modeflag
@@ -1664,8 +1677,8 @@ function tglP_Callback(hObject, eventdata, handles)
 
 % Hint: get(hObject,'Value') returns toggle state of tglP
 if handles.tglPercRank.Value, handles.tglPercRank.Value = 0; end
-if hObject.Value==1
-    hObject.String = 'Probs→Scores';
+if hObject.Value==1 
+    hObject.String = 'Probs→Scores'; 
     [~,~,~,~,~,~,handles] = perf_calibration(handles);
 else
     hObject.String='Scores→Probs';
@@ -1694,8 +1707,8 @@ if ~strcmp(Method,'none')
 else
     Titlestr = sprintf('Decision Curve (%s)', Title);
 end
-%Still needs to be changed to display_calibcurve(Labels, Probabilities, Labels_oocv, Probabilities_oocv, Titlestr);
-display_calibcurve(Labels, Probabilities, Titlestr);
+%Still needs to be changed to display_calibcurve(Labels, Probabilities, Labels_oocv, Probabilities_oocv, Titlestr); 
+display_calibcurve(Labels, Probabilities, Titlestr); 
 
 % --- Executes on button press in cmdPerfDCA.
 function cmdPerfDCA_Callback(hObject, eventdata, handles)
@@ -1724,12 +1737,12 @@ recompute = false;
 offsetIndex = 0;  % default offset removal
 
 if handles.params.probflag
-    % Probabilistic algorithms do not require output calibration!
+    % Probabilistic algorithms do not require output calibration! 
     calibrationExists = true;
     defaultCalibrationMethod = methods{end};
 else
     % Check for existing calibration
-    calibrationExists = isfield(handles.BinClass{handles.curclass},'Calibration');
+    calibrationExists = isfield(handles.BinClass{handles.curclass},'Calibration'); 
     if calibrationExists
         defaultCalibrationMethod = methods{contains(methodcmd,handles.BinClass{handles.curclass}.Calibration.Method)};
     else
@@ -1794,7 +1807,7 @@ if handles.oocvview && offsetIndex>0
         case 1
             idx = Labels == 1;
             idx_oocv = Labels_oocv == 1;
-        case 2
+        case 2 
             idx = Labels == 0;
             idx_oocv = Labels_oocv == 0;
         case 3
@@ -1894,7 +1907,7 @@ if ~handles.params.probflag
     else
         Probs = DecisionScores;
         if handles.oocvview
-            Probs_oocv = DecisionScores_oocv;
+            Probs_oocv = DecisionScores_oocv; 
             tLabels_oocv = handles.OOCV(handles.oocvind).data.(P_fld){1}.BinLabels{handles.curclass};
             if handles.selSubGroupOOCV.Value>1
                 tLabels_oocv = tLabels_oocv(SubI);
@@ -1964,7 +1977,7 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
 end
 
 
-% --- Creates and returns a handle to the GUI figure.
+% --- Creates and returns a handle to the GUI figure. 
 function h1 = NM_Results_Viewer_LayoutFcn(policy)
 % policy - create a new figure or use a singleton. 'new' or 'reuse'.
 
@@ -6651,7 +6664,7 @@ h126 = uimenu(...
 
 hsingleton = h1;
 
-% --- Set application data first then calling the CreateFcn.
+% --- Set application data first then calling the CreateFcn. 
 function local_CreateFcn(hObject, eventdata, createfcn, appdata)
 
 if ~isempty(appdata)
@@ -6736,7 +6749,7 @@ if ~gui_Create
     varargin{1} = gui_State.gui_Callback;
     if nargout
         [varargout{1:nargout}] = feval(varargin{:});
-    else
+    else       
         feval(varargin{:});
     end
     
@@ -6783,7 +6796,7 @@ else
     gui_Exported = ~isempty(gui_State.gui_LayoutFcn);
     % this application data is used to indicate the running mode of a GUIDE
     % GUI to distinguish it from the design mode of the GUI in GUIDE. it is
-    % only used by actxproxy at this time.
+    % only used by actxproxy at this time.   
     setappdata(0,genvarname(['OpenGuiWhenRunning_', gui_State.gui_Name]),1);
     if gui_Exported
         gui_hFigure = feval(gui_State.gui_LayoutFcn, gui_SingletonOpt);
@@ -6866,7 +6879,7 @@ else
     if isscalar(gui_hFigure) && ishghandle(gui_hFigure)
         % Handle the default callbacks of predefined toolbar tools in this
         % GUI, if any
-        guidemfile('restoreToolbarToolPredefinedCallback',gui_hFigure);
+        guidemfile('restoreToolbarToolPredefinedCallback',gui_hFigure); 
         
         % Update handle visibility
         set(gui_hFigure,'HandleVisibility', gui_HandleVisibility);
@@ -6927,13 +6940,13 @@ if nargin('openfig') == 2
     set(0,'defaultFigureVisible',gui_OldDefaultVisible);
 else
     % Call version of openfig that accepts 'auto' option"
-    gui_hFigure = matlab.hg.internal.openfigLegacy(name, singleton, visible);
+    gui_hFigure = matlab.hg.internal.openfigLegacy(name, singleton, visible);  
 %     %workaround for CreateFcn not called to create ActiveX
-%         peers=findobj(findall(allchild(gui_hFigure)),'type','uicontrol','style','text');
+%         peers=findobj(findall(allchild(gui_hFigure)),'type','uicontrol','style','text');    
 %         for i=1:length(peers)
 %             if isappdata(peers(i),'Control')
 %                 actxproxy(peers(i));
-%             end
+%             end            
 %         end
 end
 
