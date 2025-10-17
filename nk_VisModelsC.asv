@@ -130,8 +130,25 @@ sigPfdr         = 1;
 memorytested    = false;
 memoryprob      = false;
 fdr_comp_search = inp.fdr_comp_search;
-compwisefls      = {true,false}; compwise = compwisefls{inp.DecompMode}; 
-inp.isInter          = FUSION.flag == 2;
+compwisefls     = {true,false}; 
+compwise        = compwisefls{inp.DecompMode}; % global flag
+inp.isEarly      = FUSION.flag == 1;
+inp.isInter      = FUSION.flag == 2;
+inp.isLate       = FUSION.flag == 3;
+
+% Modify compwise according to whether current modality (see
+% nk_VisModelPrep loop contains a DR step
+if inp.isEarly
+    % Check whether early fusion is active and factorization methods are used.
+    % if so, all decompfl entries have to be set to 'yes'
+    if any(decompfl), decompfl(=true; end
+elseif inp.isLate
+    decompfl = inp.decompfl(inp.curmodal);
+    if ~decompfl, compwise = false; end
+else
+    decompfl = inp.decompfl;
+end
+
 % Loop through modalities (in early fusion: nM = 1)
 Dall = 0;
 
@@ -183,9 +200,6 @@ for i = 1 : nM
             iPREPROC = inp.PREPROC;
             iVis = inp.VIS;
     end
-    
-    % Determine if factorization methods are involved in current preprocessing chain
-    decompfl = inp.decompfl;
 
     % Check whether the reconstruction of significant-only components is
     % activated if factorization methods are used in given modality
@@ -223,10 +237,6 @@ end
 % Set comparator function depending on the type of optimization criterion
 % chosen if permfl or sigfl are true
 if permfl || sigfl, compfun = nk_ReturnEvalOperator(SVM.GridParam); end
-
-% Check whether early fusion is active and factorization methods are used.
-% if so, all decompfl entries have to be set to 'yes'
-if FUSION.flag == 1 && any(decompfl), decompfl(:)=true; end
 
 %% For factorization methods: TEMPLATE MAPPING   
 % Apply prerpocessing on the entire data and use these
@@ -465,14 +475,20 @@ for f=1:ix % Loop through CV2 permutations
                         D = getD(FUSION.flag, inp, n);
 
                         % Setup container for weight storage
-                        if ~inp.isInter
+                        if inp.isEarly
                             if ~any(decompfl) || ~compwise % no DR or component-wise processing
                                 I1.VCV1{h,n}        = nan(D, ill, 'single'); 
                             else % DR involved
                                 I1.VCV1{h,n}        = nan(D, ill, maxTrWidth, 'single'); 
                             end
-                        else
+                        elseif inp.isInter
                             if ~decompfl(n) || ~compwise % no DR in actual modality (e.g. intermediate fusion) or component-wise processing
+                                I1.VCV1{h,n}        = nan(D, ill, 'single'); 
+                            else % DR involved
+                                I1.VCV1{h,n}        = nan(D, ill, 0, 'single'); 
+                            end
+                        elseif inp.isLate 
+                            if ~decompfl(inp.curmodal) || ~compwise % no DR in actual modality (e.g. intermediate fusion) or component-wise processing
                                 I1.VCV1{h,n}        = nan(D, ill, 'single'); 
                             else % DR involved
                                 I1.VCV1{h,n}        = nan(D, ill, 0, 'single'); 
@@ -513,7 +529,7 @@ for f=1:ix % Loop through CV2 permutations
                         
                         % Prepare for permutation analysis
                         if permfl
-                            if ~inp.isInter
+                            if inp.isEarly
                                 if ~any(decompfl) || ~compwise
                                     I1.VCV1PERM{h, n}   = nan(D, ill, 'single');
                                     I1.VCV1PERM_FDR{h, n} = nan(D, ill, 'single');
@@ -523,8 +539,18 @@ for f=1:ix % Loop through CV2 permutations
                                     I1.VCV1PERM_FDR{h, n} = nan(D, ill, maxTrWidth, 'single');
                                     I1.VCV1ZSCORE{h, n} = nan(D, ill, maxTrWidth, 'single');
                                 end
-                            else
+                            elseif inp.isInter
                                 if ~decompfl(n) || ~compwise
+                                    I1.VCV1PERM{h, n}   = nan(D, ill, 'single');
+                                    I1.VCV1PERM_FDR{h, n} = nan(D, ill, 'single');
+                                    I1.VCV1ZSCORE{h, n} = nan(D, ill, 'single');
+                                else
+                                    I1.VCV1PERM{h, n}   = nan(D, ill, 0, 'single');
+                                    I1.VCV1PERM_FDR{h, n} = nan(D, ill, 0, 'single');
+                                    I1.VCV1ZSCORE{h, n} = nan(D, ill, 0, 'single');
+                                end
+                            elseif inp.isLate
+                                if ~decompfl(inp.curmodal) || ~compwise
                                     I1.VCV1PERM{h, n}   = nan(D, ill, 'single');
                                     I1.VCV1PERM_FDR{h, n} = nan(D, ill, 'single');
                                     I1.VCV1ZSCORE{h, n} = nan(D, ill, 'single');
@@ -674,7 +700,7 @@ for f=1:ix % Loop through CV2 permutations
                                 % input-space or model-space level
                                 % permutation operations
                                 if permfl || sigfl
-                                    indperm = []; indpermfeat = [];
+                                    indpermfeat = [];
                                     switch MODEFL
                                         case 'classification'
                                             pTrInd = CV.TrainInd{f,d}(CV.class{f,d}{h}.TrainInd{k,l}); 
@@ -734,10 +760,12 @@ for f=1:ix % Loop through CV2 permutations
                                         end
                                     end
                                     
-                                    fprintf('\n\t%3g | OptModel =>', u);
-                                    [perf_orig, I1.TS{h}(:,il(h)), I1.DS{h}(:,il(h))] = nk_GetTestPerf(modelTs, modelTsL, Find, MD{h}{m}{k,l}{u}, modelTr); 
-                                    fprintf(' %1.2f',perf_orig)
-                                      
+                                    if permfl || sigfl
+                                        fprintf('\n\t%3g | OptModel =>', u);
+                                        [perf_orig, I1.TS{h}(:,il(h)), I1.DS{h}(:,il(h))] = nk_GetTestPerf(modelTs, modelTsL, Find, MD{h}{m}{k,l}{u}, modelTr); 
+                                        fprintf(' %1.2f',perf_orig)
+                                    end
+
                                     if sigfl % Permutations in model space
                                         
                                         if inp.multiflag
@@ -839,16 +867,22 @@ for f=1:ix % Loop through CV2 permutations
                                                 if ~nnz(Fadd(idx_Vx)) 
                                                     minP = min(I1.VCV1WPERM{h}(idx_Vx,il(h)));
                                                     fFadd = I1.VCV1WPERM{h}(idx_Vx,il(h)) == minP;
-                                                Fadd(idx_Vx(fFadd)) = true;
+                                                    Fadd(idx_Vx(fFadd)) = true;
+                                                    fprintf('\n\t\t\t=> Mod #%g: No feature survives %s alpha = %g => relaxing to min P = %g [%g feature(s)].', nv, alpha_str, sigPthr, minP, nnz(fFadd) );
+                                                else
+                                                    fprintf('\n\t\t\t=> Mod #%g: %g / %g feature(s) significant at %s alpha = %g.', nv, nnz(Fadd(idx_Vx)), numel(idx_Vx), alpha_str, sigPthr);
+
+                                                end
                                              end
                                         else
-                                            minP = min(I1.VCV1WPERM{h}(1:nComp,il(h)));
-                                            fFadd = I1.VCV1WPERM{h}(1:nComp,il(h)) == minP;
-                                            Fadd = false(nComp,1); Fadd(fFadd) = true;
-                                        end
-                                            fprintf('| No feature significant at %s alpha = %g => relaxing to min P = %g (%g features).', alpha_str, sigPthr, minP, nnz(Fadd) );
-                                        else
-                                            fprintf('| %g / %g features significant at %s alpha = %g.', sum(Fadd), numel(Fadd), alpha_str, sigPthr);
+                                            if ~nnz(Fadd)
+                                                minP = min(I1.VCV1WPERM{h}(1:nComp,il(h)));
+                                                fFadd = I1.VCV1WPERM{h}(1:nComp,il(h)) == minP;
+                                                Fadd = false(nComp,1); Fadd(fFadd) = true;
+                                                fprintf('| No feature survives %s alpha = %g => relaxing to min P = %g (%g features).', alpha_str, sigPthr, minP, nnz(Fadd) );
+                                            else
+                                                fprintf('| %g / %g features significant at %s alpha = %g.', sum(Fadd), numel(Fadd), alpha_str, sigPthr);
+                                            end
                                         end
                                         I1.Fadd{h,il(h)} = Fadd;
                                         I1.Vind{h,il(h)} = Vind;

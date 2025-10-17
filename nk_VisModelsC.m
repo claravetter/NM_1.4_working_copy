@@ -130,8 +130,26 @@ sigPfdr         = 1;
 memorytested    = false;
 memoryprob      = false;
 fdr_comp_search = inp.fdr_comp_search;
-compwisefls      = {true,false}; compwise = compwisefls{inp.DecompMode}; 
-inp.isInter          = FUSION.flag == 2;
+compwisefls     = {true,false}; 
+compwise        = compwisefls{inp.DecompMode}; % global flag
+inp.isEarly      = FUSION.flag == 1;
+inp.isInter      = FUSION.flag == 2;
+inp.isLate       = FUSION.flag == 3;
+
+% Modify compwise according to whether current modality (see
+% nk_VisModelPrep loop) contains a DR step
+if inp.isEarly
+    % Check whether early fusion is active and factorization methods are used.
+    % if so, all decompfl entries have to be set to 'yes'
+    if any(decompfl), decompfl(:)=true; end
+elseif inp.isLate
+    decompfl = inp.decompfl(inp.curmodal);
+    % Overrun compwise depending on DR or non-DR pipeline
+    if ~decompfl, compwise = false; end
+else
+    decompfl = inp.decompfl;
+end
+
 % Loop through modalities (in early fusion: nM = 1)
 Dall = 0;
 
@@ -183,9 +201,6 @@ for i = 1 : nM
             iPREPROC = inp.PREPROC;
             iVis = inp.VIS;
     end
-    
-    % Determine if factorization methods are involved in current preprocessing chain
-    decompfl = inp.decompfl;
 
     % Check whether the reconstruction of significant-only components is
     % activated if factorization methods are used in given modality
@@ -223,10 +238,6 @@ end
 % Set comparator function depending on the type of optimization criterion
 % chosen if permfl or sigfl are true
 if permfl || sigfl, compfun = nk_ReturnEvalOperator(SVM.GridParam); end
-
-% Check whether early fusion is active and factorization methods are used.
-% if so, all decompfl entries have to be set to 'yes'
-if FUSION.flag == 1 && any(decompfl), decompfl(:)=true; end
 
 %% For factorization methods: TEMPLATE MAPPING   
 % Apply prerpocessing on the entire data and use these
@@ -465,14 +476,14 @@ for f=1:ix % Loop through CV2 permutations
                         D = getD(FUSION.flag, inp, n);
 
                         % Setup container for weight storage
-                        if ~inp.isInter
+                        if inp.isEarly
                             if ~any(decompfl) || ~compwise % no DR or component-wise processing
                                 I1.VCV1{h,n}        = nan(D, ill, 'single'); 
                             else % DR involved
                                 I1.VCV1{h,n}        = nan(D, ill, maxTrWidth, 'single'); 
                             end
                         else
-                            if ~decompfl(n) || ~compwise % no DR in actual modality (e.g. intermediate fusion) or component-wise processing
+                            if ~decompfl || ~compwise % no DR in actual modality (e.g. intermediate fusion) or component-wise processing
                                 I1.VCV1{h,n}        = nan(D, ill, 'single'); 
                             else % DR involved
                                 I1.VCV1{h,n}        = nan(D, ill, 0, 'single'); 
@@ -513,7 +524,7 @@ for f=1:ix % Loop through CV2 permutations
                         
                         % Prepare for permutation analysis
                         if permfl
-                            if ~inp.isInter
+                            if inp.isEarly
                                 if ~any(decompfl) || ~compwise
                                     I1.VCV1PERM{h, n}   = nan(D, ill, 'single');
                                     I1.VCV1PERM_FDR{h, n} = nan(D, ill, 'single');
@@ -717,7 +728,7 @@ for f=1:ix % Loop through CV2 permutations
                                     if ~isempty(GDVI{Pspos(m)})
                                         Vind = GDVI{Pspos(m)}{k,l,h}(:,u);
                                     else
-                                        Vind = true(size(Find,1),1);
+                                        Vind = ones(size(Find,1),1);
                                     end
                                     
                                     % Train model
@@ -864,7 +875,7 @@ for f=1:ix % Loop through CV2 permutations
                                         I1.VCV1WPERM{h}(1:maxFsize,il(h)) = 1;
                                         Fadd = [];
                                         I1.Fadd{h,il(h)} = true(maxFsize,1);
-                                        I1.Fadd{h,il(h)} = Vind;
+                                        I1.Vind{h,il(h)} = Vind;
                                     end
                                     
                                     % Compute original weight map in input
@@ -1385,7 +1396,7 @@ if ~batchflag
             
             if inp.isInter
                 for n=1:nM
-                    if ~inp.decompfl(n), continue; end
+                    if ~decompfl(n), continue; end
                     % Selection matrix across CV2 folds:
                     % rows = reference components, cols = CV2 models/folds
                     W = I.VCV2WPERMREF{h}{n};         % size: [nComp x nModelsCV2]

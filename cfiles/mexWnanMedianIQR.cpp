@@ -24,10 +24,10 @@ void mexFunction(int nlhs, mxArray *plhs[],
     }
 
     // Dimensions
-    const mwSize n = mxGetM(prhs[0]);
-    const mwSize p = mxGetN(prhs[0]);
-    double *X = mxGetPr(prhs[0]);
-    double *w = mxGetPr(prhs[1]);
+    const mwSize n  = mxGetM(prhs[0]);
+    const mwSize p  = mxGetN(prhs[0]);
+    double *X       = mxGetPr(prhs[0]);
+    double *w       = mxGetPr(prhs[1]);
     const mwSize wn = mxGetNumberOfElements(prhs[1]);
     if (wn != n) {
         mexErrMsgTxt("Length of w must match number of rows of X.");
@@ -40,16 +40,18 @@ void mexFunction(int nlhs, mxArray *plhs[],
     double *iq  = mxGetPr(plhs[1]);
 
     // Main loop over columns
+    #ifdef _OPENMP
     #pragma omp parallel for
+    #endif
     for (mwSize j = 0; j < p; ++j) {
         // Gather only non-NaN entries
-        std::vector<std::pair<double,double>> vals;
+        std::vector<std::pair<double,double> > vals;
         vals.reserve(n);
         double *col = X + j*n;
         for (mwSize i = 0; i < n; ++i) {
-            double xv = col[i];
+            const double xv = col[i];
             if (!mxIsNaN(xv)) {
-                vals.emplace_back(xv, w[i]);
+                vals.push_back(std::make_pair(xv, w[i]));
             }
         }
         if (vals.empty()) {
@@ -58,36 +60,41 @@ void mexFunction(int nlhs, mxArray *plhs[],
             continue;
         }
 
-        // Sort by value
+        // Sort by value (C++11-compatible lambda: explicit types)
         std::sort(vals.begin(), vals.end(),
-                  [](const auto &a, const auto &b){ return a.first < b.first; });
+                  [](const std::pair<double,double> &a,
+                     const std::pair<double,double> &b) {
+                        return a.first < b.first;
+                  });
 
-        // Compute total weight
-        double totalW = 0;
-        for (auto &pr : vals) {
-            totalW += pr.second;
+        // Compute total (nonnegative) weight
+        double totalW = 0.0;
+        for (size_t k = 0; k < vals.size(); ++k) {
+            if (vals[k].second > 0.0) totalW += vals[k].second;
+        }
+        if (totalW == 0.0) {
+            med[j] = mxGetNaN();
+            iq[j]  = mxGetNaN();
+            continue;
         }
 
-        // Prepare thresholds
-        double t1 = 0.25 * totalW;
-        double t2 = 0.50 * totalW;
-        double t3 = 0.75 * totalW;
+        // Thresholds
+        const double t1 = 0.25 * totalW;
+        const double t2 = 0.50 * totalW;
+        const double t3 = 0.75 * totalW;
 
-        // Sweep once to find quartile positions
-        double cw = 0;
+        // Sweep once to find quartiles
+        double cw = 0.0;
         double q1 = vals.back().first, q2 = q1, q3 = q1;
-        for (auto &pr : vals) {
-            cw += pr.second;
-            if (cw >= t1 && q1 == vals.back().first) {
-                q1 = pr.first;
-            }
-            if (cw >= t2 && q2 == vals.back().first) {
-                q2 = pr.first;
-            }
-            if (cw >= t3) {
-                q3 = pr.first;
-                break;
-            }
+        bool got1 = false, got2 = false, got3 = false;
+
+        for (size_t k = 0; k < vals.size(); ++k) {
+            const double wk = (vals[k].second > 0.0) ? vals[k].second : 0.0;
+            cw += wk;
+
+            if (!got1 && cw >= t1) { q1 = vals[k].first; got1 = true; }
+            if (!got2 && cw >= t2) { q2 = vals[k].first; got2 = true; }
+            if (!got3 && cw >= t3) { q3 = vals[k].first; got3 = true; break; }
         }
 
         med[j] = q2;

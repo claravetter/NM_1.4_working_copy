@@ -20,6 +20,7 @@ if iscell(cmp)
     idx = visData.Report{curclass}.components_idxs == curmod;
 else
     isInter = false;
+    idx =[];
 end
 meanPval = []; meanCorr=[]; selPct = [];
 if isInter
@@ -33,7 +34,7 @@ else
     meanPval = cmp.mean_p_cv2;
     meanCorr = cmp.mean_r_cv2;
     selPct = cmp.coverage_cv1(:,1) *100 ./ cmp.coverage_cv1(:,2);
-    keptMask  = visData.CompKept{1}{idx};
+    keptMask  = visData.CompKept{1};
 end
 
 if isempty(meanCorr) && isempty(meanPval)

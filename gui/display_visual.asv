@@ -422,8 +422,7 @@ switch meas{measind}
          end
          
     case 'Model P value histogram'
-         cb = findobj(handles.axes33.Parent, 'Type', 'ColorBar', 'Axes', handles.axes33);
-         delete(cb)
+
          n         = numel(y);
          sigma     = nm_nanstd(y);
          iqrValue  = prctile(y,75) - prctile(y,25);
@@ -488,148 +487,148 @@ switch meas{measind}
 
     case NetworkCorrMatStr
 
-         set(handles.pn3DView,'Visible','off'); 
-         % grab the old position so we don’t clobber bottom & height
-         pos = handles.axes33.Position;     
-        
-         % center horizontally & make half‑width
-         pos(1) = (1 - 0.5)/2;    % = 0.25
-         pos(3) = 0.5;
-        
-         % write it back
-         handles.axes33.Position = pos;
-         set(handles.axes33,'Visible','on'); cla; hold on
-         feats = v.params.features; 
-         if ~isempty(handles.txtAlterFeats.String)
-            altfeatsvar = handles.txtAlterFeats.String;
-            feats = evalin('base',altfeatsvar);
-         end
-       
-         if filterfl
-             FltMetr = handles.selVisMeas2.String{handles.selVisMeas2.Value};
-             switch FltMetr
-                 case {'CVR of feature weights [Overall Mean]', 'CVR (SD-based) of feature weights [Overall Mean]', 'CVR (SEM-based) of feature weights [Overall Mean]'}
-                     [ythr,~,~,vlineval] = CVRatio(v,curclass,multiflag);
-                     if isempty(filterthr)
-                         handles.txtThrVisMeas2.String='-2 2'; 
-                         filterthr = vlineval;
-                     else
-                         filterthr = str2double(filterthr);
-                     end
-                 case 'Feature selection probability [Overall Mean]'
-                     [ythr,~,~,vlineval] = FeatProb(v,curclass,multiflag);
-                     if isempty(filterthr)
-                         handles.txtThrVisMeas2.String='0.5'; 
-                         filterthr = vlineval;
-                     else
-                         filterthr = str2double(filterthr);
-                     end
-                 case 'Probability of feature reliability (95%-CI) [CV2 Mean]'
-                     [ythr,~,~,vlineval] = Prob_CV2(v,curclass,multiflag);
-                     if isempty(filterthr)
-                         handles.txtThrVisMeas2.String='-0.5 0.5'; 
-                         filterthr = vlineval;
-                     else
-                         filterthr = str2double(filterthr);
-                     end
-                 case 'Sign-based consistency -log10(P value)'
-                     [ythr,~,~,vlineval] = SignBased_CV2_p_uncorr(v,curclass,multiflag);
-                     if isempty(filterthr)
-                         handles.txtThrVisMeas2.String=num2str(-log10(0.05),'%1.2f'); 
-                         filterthr = vlineval;
-                     else
-                         filterthr = str2double(filterthr);
-                     end
-                 case 'Sign-based consistency -log10(P value, FDR)'
-                     [ythr,~,~,vlineval] = SignBased_CV2_p_fdr(v,curclass,multiflag);
-                     if isempty(filterthr)
-                         handles.txtThrVisMeas2.String=num2str(-log10(0.05),'%1.2f'); 
-                         filterthr = vlineval;
-                     else
-                         filterthr = str2double(filterthr);
-                     end
-                 case 'Analytical -log10(P Value) for Linear SVM [CV2 Mean]'
-                     [ythr,~,~,vlineval] = Analytical_p(v,curclass,multiflag);
-                     if isempty(filterthr)
-                         handles.txtThrVisMeas2.String=num2str(-log10(0.05),'%1.2f'); 
-                         filterthr = vlineval;
-                     else
-                         filterthr = str2double(filterthr);
-                     end
-                 case 'Analytical -log10(P Value, FDR) for Linear SVM [CV2 Mean]'
-                     [ythr,~,~,vlineval] = Analyitcal_p_fdr(v,curclass,multiflag);
-                     if isempty(filterthr)
-                         handles.txtThrVisMeas2.String=num2str(-log10(0.05),'%1.2f'); 
-                         filterthr = vlineval;
-                     else
-                         filterthr = str2double(filterthr);
-                     end
+        set(handles.pn3DView,'Visible','off'); set(handles.axes33,'Visible','on'); cla; hold on feats = v.params.features; if ~isempty(handles.txtAlterFeats.String) altfeatsvar = handles.txtAlterFeats.String; feats = evalin('base',altfeatsvar); end if filterfl FltMetr = handles.selVisMeas2.String{handles.selVisMeas2.Value}; switch FltMetr case {'CVR of feature weights [Overall Mean]', 'CVR (SD-based) of feature weights [Overall Mean]', 'CVR (SEM-based) of feature weights [Overall Mean]'} [ythr,~,~,vlineval] = CVRatio(v,curclass,multiflag); if isempty(filterthr) handles.txtThrVisMeas2.String='-2 2'; filterthr = vlineval; else filterthr = str2double(filterthr); end case 'Feature selection probability [Overall Mean]' [ythr,~,~,vlineval] = FeatProb(v,curclass,multiflag); if isempty(filterthr) handles.txtThrVisMeas2.String='0.5'; filterthr = vlineval; else filterthr = str2double(filterthr); end case 'Probability of feature reliability (95%-CI) [CV2 Mean]' [ythr,~,~,vlineval] = Prob_CV2(v,curclass,multiflag); if isempty(filterthr) handles.txtThrVisMeas2.String='-0.5 0.5'; filterthr = vlineval; else filterthr = str2double(filterthr); end case 'Sign-based consistency -log10(P value)' [ythr,~,~,vlineval] = SignBased_CV2_p_uncorr(v,curclass,multiflag); if isempty(filterthr) handles.txtThrVisMeas2.String=num2str(-log10(0.05),'%1.2f'); filterthr = vlineval; else filterthr = str2double(filterthr); end case 'Sign-based consistency -log10(P value, FDR)' [ythr,~,~,vlineval] = SignBased_CV2_p_fdr(v,curclass,multiflag); if isempty(filterthr) handles.txtThrVisMeas2.String=num2str(-log10(0.05),'%1.2f'); filterthr = vlineval; else filterthr = str2double(filterthr); end case 'Analytical -log10(P Value) for Linear SVM [CV2 Mean]' [ythr,~,~,vlineval] = Analytical_p(v,curclass,multiflag); if isempty(filterthr) handles.txtThrVisMeas2.String=num2str(-log10(0.05),'%1.2f'); filterthr = vlineval; else filterthr = str2double(filterthr); end case 'Analytical -log10(P Value, FDR) for Linear SVM [CV2 Mean]' [ythr,~,~,vlineval] = Analyitcal_p_fdr(v,curclass,multiflag); if isempty(filterthr) handles.txtThrVisMeas2.String=num2str(-log10(0.05),'%1.2f'); filterthr = vlineval; else filterthr = str2double(filterthr); end end % New (filter on): sort by the chosen metric ythr sI = get_sort_index(ythr(:), sortfl); y = y(sI,sI); feats = feats(sI); y = y(featind,featind); feats = feats(featind); %y.diag if numel(filterthr)>1 Ix2 = (ythr >= min(filterthr) | ythr <= max(filterthr))'; else Ix2 = (abs(ythr)>= filterthr)'; end Ix2 = Ix2(sI); Ix2 = Ix2(featind); Ix = any(y) & Ix2; else % New (filter on): sort by the chosen metric sI = get_sort_index(mean(y), sortfl); y = y(sI,sI); feats = feats(sI); y = y(featind,featind); feats = feats(featind); Ix = any(y); end y = y(Ix,Ix); feats = feats(Ix); nF = numel(feats); if nF<50, FS = 10; elseif nF<100, FS = 7; elseif nF < 150, FS = 5; else, FS = 0; end yy = y;
+
+            % Safety & niceties
+             yy = double(yy);
+             yy(~isfinite(yy)) = 0;                     % drop NaN/Inf edges
+             yy(1:size(yy,1)+1:numel(yy)) = 0;         % remove self-loops
+             % Tweak these to taste
+             K_PER_NODE = 5;      % up to 5 strongest connections per node
+             MAX_GLOBAL = 250;    % and at most 250 edges overall
+             GAMMA      = 0.8;    % edge color contrast (0.6–1.0 is nice)
+    
+             cla reset;
+    
+             switch meas{measind}
+                case NetworkCorrMatStr{1}  % signed correlation matrix
+                    % Signed weights: color by sign, width/alpha by |r|
+                    [yy, keepMask] = nm_sparsify_topk(yy, K_PER_NODE, MAX_GLOBAL);
+                    G  = graph(yy ~= 0);
+                    % Pack signed edge weights
+                    E  = table2array(G.Edges(:, 'EndNodes'));
+                    W  = arrayfun(@(k) yy(E(k,1), E(k,2)), 1:height(G.Edges))';
+                    G.Edges.Weight = W;
+    
+                    % Layout (force-based) and plotting
+                    pgy = plot(G, 'Layout','force', 'UseGravity',true, 'Iterations',80);
+                    axis off
+                    title('Feature network (correlations)', 'FontWeight','bold');
+    
+                    % Node labels: only show top-degree nodes if crowded
+                    deg = degree(G);
+                    pgy.MarkerSize = 4 + 6*rescale(deg,0,1);
+                    if nF > 80
+                        [~,ord] = sort(deg,'descend');
+                        show = ord(1:min(60,numel(ord)));
+                        L = repmat({''}, numnodes(G), 1);
+                        L(show) = feats(show);
+                        pgy.NodeLabel = L;
+                    else
+                        pgy.NodeLabel = feats;
+                    end
+    
+                    % Signed diverging colors (blue neg, red pos)
+                    signedMag = sign(W).*abs(W).^GAMMA;      % enhance contrast
+                    clim([-1 1])
+                    pgy.EdgeCData = signedMag;
+                    pgy.EdgeColor = 'flat';
+                    pgy.LineWidth = 0.5 + 4*abs(W);          % perceptual width
+                    pgy.EdgeAlpha = 0.15 + 0.85*rescale(abs(W),0,1);
+    
+                    % Simple custom diverging colormap (blue–white–red)
+                    N = 256; t = linspace(0,1,N/2)';
+                    blue = [0.23+0.45*t, 0.30+0.55*t, 0.75+0.10*t]; % to pale
+                    red  = [0.87-0.16*t, 0.87-0.85*t, 0.87-0.72*t];
+                    cmap = [flipud(blue); red];
+                    colormap(cmap);
+                    cb = colorbar; ylabel(cb,'Correlation (signed)');
+    
+                    pgy.NodeColor = [0.15 0.15 0.15];
+    
+                case NetworkCorrMatStr{2}  % raw p-values
+                    % Use -log10(p) magnitude, dim non-sig edges
+                    P = yy;
+                    P(~isfinite(P)) = 1;
+                    [P, keepMask] = nm_sparsify_topk(P, K_PER_NODE, MAX_GLOBAL);
+                    G  = graph(P ~= 0);
+                    E  = table2array(G.Edges(:, 'EndNodes'));
+                    pv = arrayfun(@(k) P(E(k,1), E(k,2)), 1:height(G.Edges))';
+                    mag = -log10(max(pv, realmin));          % magnitude
+                    G.Edges.Weight = mag;
+    
+                    pgy = plot(G, 'Layout','force', 'UseGravity',true, 'Iterations',80);
+                    axis off
+                    title('Feature network (-log_{10} p)', 'FontWeight','bold');
+    
+                    % Nodes
+                    deg = degree(G);
+                    pgy.MarkerSize = 4 + 6*rescale(deg,0,1);
+                    if nF > 80
+                        [~,ord] = sort(deg,'descend');
+                        show = ord(1:min(60,numel(ord)));
+                        L = repmat({''}, numnodes(G), 1);
+                        L(show) = feats(show);
+                        pgy.NodeLabel = L;
+                    else
+                        pgy.NodeLabel = feats;
+                    end
+                    pgy.NodeColor = [0.15 0.15 0.15];
+    
+                    % Edge styling
+                    pgy.EdgeCData = mag;
+                    pgy.EdgeColor = 'flat';
+                    pgy.LineWidth = 0.5 + 3.5*rescale(mag,0,prctile(mag,99));
+                    alphaSoft = 0.1 + 0.9*(pv < 0.05);
+                    pgy.EdgeAlpha = 0.15 + 0.85*rescale(mag,0,prctile(mag,99)).*alphaSoft;
+    
+                    colormap(parula(256));
+                    cb = colorbar; ylabel(cb,'-log_{10}(p)');
+    
+                case NetworkCorrMatStr{3}  % FDR p-values (upper triangle was passed)
+                    % Symmetrise, then same as above but mark q<0.05 strongly
+                    P = yy;
+                    P = triu(P,1) + triu(P,1)';              % ensure symmetric off-diagonal
+                    P(~isfinite(P)) = 1;
+                    [P, keepMask] = nm_sparsify_topk(P, K_PER_NODE, MAX_GLOBAL);
+                    G  = graph(P ~= 0);
+                    E  = table2array(G.Edges(:, 'EndNodes'));
+                    qv = arrayfun(@(k) P(E(k,1), E(k,2)), 1:height(G.Edges))';
+                    mag = -log10(max(qv, realmin));
+                    G.Edges.Weight = mag;
+    
+                    pgy = plot(G, 'Layout','force', 'UseGravity',true, 'Iterations',80);
+                    axis off
+                    title('Feature network (-log_{10} q, FDR)', 'FontWeight','bold');
+    
+                    % Nodes
+                    deg = degree(G);
+                    pgy.MarkerSize = 4 + 6*rescale(deg,0,1);
+                    if nF > 80
+                        [~,ord] = sort(deg,'descend');
+                        show = ord(1:min(60,numel(ord)));
+                        L = repmat({''}, numnodes(G), 1);
+                        L(show) = feats(show);
+                        pgy.NodeLabel = L;
+                    else
+                        pgy.NodeLabel = feats;
+                    end
+                    pgy.NodeColor = [0.15 0.15 0.15];
+    
+                    % Edge styling: strongly emphasize q<0.05
+                    pgy.EdgeCData = mag;
+                    pgy.EdgeColor = 'flat';
+                    pgy.LineWidth = 0.5 + 3.5*rescale(mag,0,prctile(mag,99));
+                    alphaSoft = 0.1 + 0.9*(qv < 0.05);
+                    pgy.EdgeAlpha = 0.10 + 0.90*rescale(mag,0,prctile(mag,99)).*alphaSoft;
+    
+                    colormap(parula(256));
+                    cb = colorbar; ylabel(cb,'-log_{10}(q)');
              end
-             % New (filter on): sort by the chosen metric ythr
-             sI = get_sort_index(ythr(:), sortfl);
-             y = y(sI,sI);
-             feats = feats(sI);
-             y = y(featind,featind);
-             feats = feats(featind);
-             %y.diag
-             if numel(filterthr)>1
-                Ix2 = (ythr >= min(filterthr) | ythr <= max(filterthr))';
-             else 
-                Ix2 = (abs(ythr)>= filterthr)'; 
-             end
-             Ix2 = Ix2(sI); Ix2 = Ix2(featind);
-             Ix = any(y) & Ix2;
-         else
-             % New (filter on): sort by the chosen metric 
-             sI = get_sort_index(mean(y), sortfl);
-             y = y(sI,sI);
-             feats = feats(sI);
-             y = y(featind,featind);
-             feats = feats(featind);
-             Ix = any(y);
-         end
-         y = y(Ix,Ix);
-         feats = feats(Ix);
-         yy = y; 
-       
-        % Safety & niceties
-         yy = double(yy);
-         yy(~isfinite(yy)) = 0;                     % drop NaN/Inf edges
-         yy(1:size(yy,1)+1:numel(yy)) = 0;         % remove self-loops
-         % Tweak these to taste
-         K_PER_NODE = 5;      % up to 5 strongest connections per node
-         MAX_GLOBAL = 250;    % and at most 250 edges overall
-         GAMMA      = 0.8;    % edge color contrast (0.6–1.0 is nice)
-
-         cla reset;
-
-         switch meas{measind}
-            case NetworkCorrMatStr{1}  % signed correlation matrix
-               [~, handles.pgy] = nm_plot_feature_network(yy, feats, posColor, negColor, ...
-                'Polarity','bi', ...
-                'Title','Feature network (correlations)', ...
-                'ColorbarLabel','Correlation (signed)', ...
-                'KPerNode',K_PER_NODE, 'MaxGlobal',MAX_GLOBAL, 'Gamma',GAMMA);
-
-            case NetworkCorrMatStr{2}  % -log10 p-values
-              [~, handles.pgy] = nm_plot_feature_network(yy, feats, posColor, negColor, ...
-                'Polarity','uni', ...
-                'Title','Feature network (-log_{10} p)', ...
-                'ColorbarLabel','-log_{10}(p)', ...
-                'KPerNode',K_PER_NODE, 'MaxGlobal',MAX_GLOBAL);
-
-
-            case NetworkCorrMatStr{3}  % FDR p-values (
-               [~, handles.pgy] = nm_plot_feature_network(yy, feats, posColor, negColor, ...
-                    'Polarity','uni', ...
-                    'Title','Feature network (-log_{10} q, FDR)', ...
-                    'ColorbarLabel','-log_{10}(q)', ...
-                    'KPerNode',K_PER_NODE, 'MaxGlobal',MAX_GLOBAL);
-         end
-         
+    
+        
     otherwise 
-        cb = findobj(handles.axes33.Parent, 'Type', 'ColorBar', 'Axes', handles.axes33);
-        delete(cb)
+
         ind = get_sort_index(y(:,selC), sortfl);     % sort by y according to drop-down
         y   = y(ind,selC);  y = y(featind);
         % enable/disable color pickers based on sign content
@@ -677,6 +676,9 @@ switch meas{measind}
                     end
                     h = herrorbar(ydraw, x, se, se,'ko');
                     set(h,'MarkerSize',0.001);
+                    ylimoff = nm_nanmax(se);
+                else 
+                    ylimoff = 0;
                 end
 
                 if ~isempty(vlineval) 
@@ -1316,254 +1318,6 @@ function out = ternary(cond, a, b)
     out(cond) = a(cond);
 end
 
-function [G, pgy, out] = nm_plot_feature_network(M, feats, posColor, negColor, varargin)
-%NM_PLOT_FEATURE_NETWORK  Render a feature network from an input metric matrix.
-%
-% [G,pgy,out] = nm_plot_feature_network(M, feats, posColor, negColor, ...)
-%
-% Inputs
-%   M         : square matrix of edge metrics
-%               - Bipolar (signed): correlations in [-1,1]
-%               - Unipolar        : magnitudes (e.g., -log10(p) or -log10(q)) >= 0
-%   feats     : cellstr or string vector of node labels (length = size(M,1))
-%   posColor  : [1x3] RGB for positive edges / high magnitudes
-%   negColor  : [1x3] RGB for negative edges (only used in bipolar mode)
-%
-% Name-Value options (all optional)
-%   'Polarity'       : 'auto' | 'bi' | 'uni'   (default 'auto'; auto -> bi if min(M)<0)
-%   'Title'          : char title for axes     (default auto by polarity)
-%   'ColorbarLabel'  : char label for colorbar (default auto by polarity)
-%   'Axes'           : target axes handle      (default = gca)
-%   'KPerNode'       : top-k edges per node kept in sparsifier (default 5)
-%   'MaxGlobal'      : global cap on edges kept (default 250)
-%   'Gamma'          : contrast exponent for color mapping (default 0.8)
-%   'Neutral'        : [1x3] RGB center color  (default [0.98 0.98 0.98])
-%   'MaxLabels'      : # node labels to show   (default heuristic)
-%   'LabelCap'       : max chars before ellipsis (default 38)
-%   'WrapAt'         : wrap length per line    (default 18)
-%
-% Outputs
-%   G     : graph object
-%   pgy   : GraphPlot handle
-%   out   : struct with fields (W, topIdx, deg, keptMatrix, polarity, p99)
-%
-% Dependencies (helpers in your path or same file):
-%   nm_sparsify_topk, nm_top_nodes_by_strength, nm_wrap_ellipsis
-%
-% Example uses:
-%   % Correlation (signed / bipolar)
-%   nm_plot_feature_network(R, feats, posColor, negColor, 'Polarity','bi', ...
-%                           'Title','Feature network (correlations)', ...
-%                           'ColorbarLabel','Correlation (signed)');
-%
-%   % -log10(p) (unipolar)
-%   nm_plot_feature_network(Plog, feats, posColor, negColor, 'Polarity','uni', ...
-%                           'Title','Feature network (-log_{10} p)', ...
-%                           'ColorbarLabel','-log_{10}(p)');
-
-    % -------- Parse inputs
-    p = inputParser;
-    addParameter(p,'Polarity','auto');
-    addParameter(p,'Title','');
-    addParameter(p,'ColorbarLabel','');
-    addParameter(p,'Axes',[]);
-    addParameter(p,'KPerNode',5);
-    addParameter(p,'MaxGlobal',250);
-    addParameter(p,'Gamma',0.8);
-    addParameter(p,'Neutral',[0.98 0.98 0.98]);
-    addParameter(p,'MaxLabels',[]);
-    addParameter(p,'LabelCap',20);
-    addParameter(p,'WrapAt',18);
-    parse(p,varargin{:});
-    o = p.Results;
-
-    if isstring(feats), feats = cellstr(feats); end
-    feats = feats(:);
-
-    A = double(M);
-    A(~isfinite(A)) = 0;
-    n = size(A,1);
-    if size(A,2) ~= n
-        error('nm_plot_feature_network:MatrixNotSquare','M must be square.');
-    end
-    % Symmetrise and zero diagonal
-    A = (A + A.')/2;
-    A(1:n+1:end) = 0;
-
-    % Determine polarity
-    if strcmpi(o.Polarity,'auto')
-        polarity = 'uni';
-        if any(A(:) < 0), polarity = 'bi'; end
-    else
-        polarity = lower(o.Polarity);
-    end
-
-    % Defaults for titles/labels
-    if isempty(o.Title)
-        if strcmp(polarity,'bi'), o.Title = 'Feature network (correlations)'; 
-        else, o.Title = 'Feature network'; end
-    end
-    if isempty(o.ColorbarLabel)
-        if strcmp(polarity,'bi'), o.ColorbarLabel = 'Correlation (signed)';
-        else, o.ColorbarLabel = 'Magnitude'; end
-    end
-
-    % Sparsify to keep it readable
-    [Akeep, ~] = nm_sparsify_topk(A, o.KPerNode, o.MaxGlobal);
-
-    % Build graph
-    G = graph(Akeep ~= 0);
-    if numnodes(G) ~= n
-        error('nm_plot_feature_network:GraphBuild','Unexpected node count.');
-    end
-    E = G.Edges.EndNodes;
-    m = size(E,1);
-    if m == 0
-        ax = ensureAxes(o.Axes);
-        axes(ax); cla(ax);
-        title(ax, [o.Title ' (no edges kept)']);
-        pgy = [];
-        out = struct('W',[], 'topIdx',[], 'deg',[], 'keptMatrix',Akeep, ...
-                     'polarity',polarity, 'p99',[]);
-        return;
-    end
-
-    % Edge weights vector aligned to G.Edges
-    W = arrayfun(@(k) Akeep(E(k,1), E(k,2)), 1:m).';
-    G.Edges.Weight = W;
-
-    % Target axes & plot
-    ax = ensureAxes(o.Axes);
-    axes(ax); 
-    pgy = plot(G, 'Layout','force', 'UseGravity',true, 'Iterations',80);
-    axis(ax,'off');
-    %title(ax, o.Title, 'FontWeight','bold');
-
-    % Node size by degree
-    deg = degree(G);
-    pgy.MarkerSize = 4 + 6*rescale(deg,0,1);
-
-    % Label selection (top-K by strength)
-    nN = numnodes(G);
-    if isempty(o.MaxLabels)
-        Klabels = min(40, max(12, round(280/sqrt(nN))));
-    else
-        Klabels = max(0, o.MaxLabels);
-    end
-    topIdx = nm_top_nodes_by_strength(G, W, Klabels);
-
-    shortLabs = repmat({''}, nN, 1);
-    shortLabs(topIdx) = nm_wrap_ellipsis(feats(topIdx), o.LabelCap, o.WrapAt);
-    shortLabs = cellfun(@char, shortLabs, 'UniformOutput', false);
-    pgy.NodeLabel = shortLabs;
-    pgy.NodeLabelColor = [0.1 0.1 0.1];
-    pgy.NodeFontSize   = 9;
-    pgy.NodeColor      = [0.15 0.15 0.15];
-
-    % Datatips (full labels + node index)
-    enableDatatips(ax, pgy, feats);
-
-    % Edge styling by polarity
-    p99Var = [];   % holds the 99th-percentile scale for unipolar plots
-
-    switch polarity
-        case 'bi'   % bipolar signed (e.g., correlations)
-            signedMag = sign(W) .* abs(W).^o.Gamma;  % in [-1,1]
-            pgy.EdgeCData = signedMag;
-            pgy.EdgeColor = 'flat';
-            clim(ax,[-1 1]);
-
-            % Diverging colormap: negColor -> neutral -> posColor
-            N  = 256; n2 = N/2;
-            neutral = o.Neutral;
-            negGrad = [linspace(negColor(1),neutral(1),n2)', ...
-                       linspace(negColor(2),neutral(2),n2)', ...
-                       linspace(negColor(3),neutral(3),n2)'];
-            posGrad = [linspace(neutral(1),posColor(1),n2)', ...
-                       linspace(neutral(2),posColor(2),n2)', ...
-                       linspace(neutral(3),posColor(3),n2)'];
-            colormap(ax,[negGrad; posGrad]);
-
-            pgy.LineWidth = 0.5 + 4*abs(W);
-            pgy.EdgeAlpha = 0.6;
-
-        case 'uni'  % unipolar magnitude (e.g., -log10 p / q)
-            mag = max(0, W);                 % ensure nonnegative
-            p99 = max(eps, prctile(mag, 99));
-            p99Var = p99;
-            pgy.EdgeCData = mag;
-            pgy.EdgeColor = 'flat';
-            clim(ax,[0 p99]);
-
-            % Neutral -> posColor ramp
-            N  = 256; neutral = o.Neutral;
-            posGrad = [linspace(neutral(1),posColor(1),N)', ...
-                       linspace(neutral(2),posColor(2),N)', ...
-                       linspace(neutral(3),posColor(3),N)'];
-            colormap(ax, posGrad);
-
-            pgy.LineWidth = 0.5 + 3.5*min(1, mag./p99);
-            pgy.EdgeAlpha = 0.6;
-    end
-
-    % Colorbar on the left (westoutside)
-    cb = colorbar(ax,'Location','westoutside');
-    ylabel(cb, o.ColorbarLabel);
-    cb.FontSize = 10;
-
-    % Outputs
-    out = struct('W',W, 'topIdx',topIdx, 'deg',deg, ...
-             'keptMatrix',Akeep, 'polarity',polarity, ...
-             'p99', p99Var);
-end
-
-% ---------- helpers (local) ----------
-function ax = ensureAxes(ax)
-    if isempty(ax) || ~isvalid(ax), ax = gca; end
-end
-
-function enableDatatips(ax, pgy, feats)
-% Robust datatip setup for GraphPlot across MATLAB versions (no .Graph needed)
-
-    % Ensure features vector matches node count
-    nN = numel(pgy.XData);                % # nodes from plot data
-    if isstring(feats), feats = cellstr(feats); end
-    feats = feats(:);
-    if numel(feats) ~= nN
-        % pad/truncate defensively
-        F = repmat({''}, nN, 1);
-        F(1:min(nN,numel(feats))) = feats(1:min(nN,numel(feats)));
-        feats = F;
-    end
-
-    % Make the plot pickable (required for datatips in some versions)
-    set(pgy, 'HitTest','on', 'PickableParts','all');
-
-    % Turn on datatip interaction
-    fig = ancestor(ax,'figure');
-    if ~isa(ax,'matlab.ui.control.UIAxes')
-        dcm = datacursormode(fig);
-        dcm.Enable = 'on';
-    else
-        ax.Interactions = [datatipInteraction panInteraction zoomInteraction];
-    end
-
-    % Define the datatip template (replace in one shot)
-    try
-        dt = pgy.DataTipTemplate;
-        r1 = dataTipTextRow('Feature', feats);          % full label
-        r2 = dataTipTextRow('Node', (1:nN)');           % node index
-        dt.DataTipRows = [r1 r2];
-    catch
-        % Older MATLAB without DataTipTemplate/dataTipTextRow:
-        % gently skip custom template; datatips will still show default info.
-    end
-end
-
-function z = iif(cond, a, b)
-    if cond, z = a; else, z = b; end
-end
-
 function [Ysym, keepMask] = nm_sparsify_topk(A, kPerNode, maxGlobal)
 %NM_SPARSIFY_TOPK  Keep strongest edges for readability in graph plots.
 %
@@ -1641,70 +1395,4 @@ function [Ysym, keepMask] = nm_sparsify_topk(A, kPerNode, maxGlobal)
     As = sparse(ii(keepMask), jj(keepMask), vv(keepMask), n, n);
     Ysym = As + As.';        % symmetric, zero diagonal preserved
     Ysym = full(Ysym);       % return full to play nicely with downstream code
-end
-
-function S = nm_wrap_ellipsis(strs, maxChars, wrapAt)
-% Return a cell array of CHAR labels, truncated and softly wrapped with '\n'.
-    if isstring(strs), strs = cellstr(strs); end
-    if ischar(strs),   strs = cellstr(strs); end
-    S = cell(size(strs));
-    for i = 1:numel(strs)
-        s = char(strs{i});
-        if numel(s) > maxChars
-            s = [s(1:maxChars-3) '...'];
-        end
-        if wrapAt > 0 && numel(s) > wrapAt
-            out = '';
-            k = 1;
-            while k <= numel(s)
-                j = min(k+wrapAt-1, numel(s));
-                seg = s(k:j);
-                sp  = find(seg==' ', 1, 'last');
-                if ~isempty(sp) && (k+sp-1) < j
-                    j = k+sp-1;
-                end
-                out = [out s(k:j) newline]; %#ok<AGROW>
-                k = j+1;
-            end
-            s = strtrim(out);
-        end
-        S{i} = s;
-    end
-end
-
-function idx = nm_top_nodes_by_strength(G, edgeWeight, K)
-% Top-K nodes by sum of |edge weights| on incident edges.
-% edgeWeight can be:
-%   (a) vector: length == height(G.Edges)
-%   (b) square matrix: symmetric weights, diag ignored
-
-    n  = numnodes(G);
-    E  = G.Edges.EndNodes;               % [m x 2]
-    m  = size(E,1);
-
-    % --- get edge weights aligned to G.Edges rows
-    if isvector(edgeWeight) && numel(edgeWeight) == m
-        w = edgeWeight(:);
-    elseif ismatrix(edgeWeight) && size(edgeWeight,1) == size(edgeWeight,2)
-        M = double(edgeWeight);
-        M(~isfinite(M)) = 0;
-        % pull weights per edge (i,j) from the matrix
-        w = arrayfun(@(r) M(E(r,1), E(r,2)), 1:m).';
-    elseif ismember('Weight', G.Edges.Properties.VariableNames)
-        % fallback: use any Weight column already on the graph
-        w = G.Edges.Weight(:);
-    else
-        % last resort: unweighted
-        w = ones(m,1);
-    end
-
-    w(~isfinite(w)) = 0;
-    w = abs(w);
-
-    % --- node strength = sum of incident |weights|
-    score = accumarray(E(:), repmat(w,2,1), [n 1], @sum, 0);
-
-    % --- top-K nodes
-    [~,ord] = sort(score,'descend');
-    idx = ord(1:min(K,numel(ord)));
 end

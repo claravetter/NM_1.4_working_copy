@@ -300,19 +300,35 @@ for n = 1:nM
         %-----------------------------------------------------------
         if ~decompfl(n)
             nmPx = Fu(fVI);
-            tY = zeros(size(Y,1), numel(nmPx)); 
+            tY = zeros(size(Y,1), numel(nmPx));
             if nM > 1
                 % VI references the respective modality n.
-                tY(:,nmPx ) = Y(:, VI(Fu) == n); 
+                tY(:, nmPx) = Y(:, VI(Fu) == n);
             else
-                tY(:,nmPx ) = Y;
+                tY(:, nmPx) = Y;
             end
-            IN.zerooutflag = 1;
-            tY = nk_PerfZeroOut(tY, IN);
-            nmR  = nk_CorrMat(L, tY, 'pearson'); 
-            nmSR = nk_CorrMat(L, tY, 'spearman');
+            % Treat non-finites as missing for correlation
+            tY(~isfinite(tY)) = NaN;
+            L(~isfinite(L))   = NaN;
+            
+            % --- Robust correlations (pairwise deletion of NaNs) ---
+            % Cross-corr between model weights L and tY
+            nmR  = corr(L, tY, 'Type','Pearson',  'Rows','pairwise');
+            nmSR = corr(L, tY, 'Type','Spearman', 'Rows','pairwise');
+            
+            % Within tY correlation
             if ~memprob
-                nmC  = corrcoef(tY);
+                nmC = corr(tY, 'Type','Pearson', 'Rows','pairwise');
+                % neutralize constant-variance or all-NaN columns
+                s        = std(tY, 0, 1, 'omitnan');     % row-wise=obs, col-wise=vars
+                allNaN   = all(isnan(tY), 1);
+                constCols = (s == 0) | allNaN;
+                if any(constCols)
+                    nmC(constCols, :) = 0;
+                    nmC(:, constCols) = 0;
+                    d = 1:size(nmC,1);                   % nmC is square
+                    nmC(d,d) = 1;                        % keep autocorr on diagonal
+                end
             end
         else
             % DR is active: Create correlation outputs as matrices with the same

@@ -52,14 +52,14 @@ imgZoomOut = loadIconWithBackground(fullfile(iconsDir,'uiZoomIn_image.png'), [24
 imgSave3D = loadIconWithBackground(fullfile(iconsDir,'uiSave3D_image.png'), [240 240 240], [24 24]);
 imgLoad3D = loadIconWithBackground(fullfile(iconsDir,'uiLoad3D_image.png'), [240 240 240], [24 24]);
 imgHome3D = loadIconWithBackground(fullfile(iconsDir,'uiHome_image.png'), [240 240 240], [24 24]);
-
+S=[];
 Tmin = []; Tmax = [];
 hasNeg = false; hasPos = false;
 thrNeg = []; thrPos = [];
 negColor = [0 0 1];   % defaults
 midColor = [1 1 1];
 posColor = [1 0 0];
-Vs = []; S = []; dims = [];
+Vs = []; ST = []; dims = [];
 Vt = []; T = []; AtlasOrig=[]; VatOrig = [];
 lut=[]; 
 xBtn=[];
@@ -1354,9 +1354,9 @@ function onStructSelect(src,~)
     end
 end
 
-% function [fig, innerSquare] = lockSquareCanvas(ax3D, S)
+% function [fig, innerSquare] = lockSquareCanvas(ax3D, ST)
 %     %--- fixed limits with pad (avoid clipping while rotating)
-%     [Nx, Ny, Nz] = size(S);
+%     [Nx, Ny, Nz] = size(ST);
 %     pad = 0.12 * max([Nx Ny Nz]);                % 12% pad; tweak if needed
 %     xlim(ax3D,[1-pad, Nx+pad]);
 %     ylim(ax3D,[1-pad, Ny+pad]);
@@ -1426,8 +1426,8 @@ function onLoadStruct(src,~,newStructFile)
 
     % Now reload the structural volume
     Vs      = spm_vol(structFileSel);
-    S       = spm_read_vols(Vs);
-    smin = min(S(:)); smax = max(S(:)); st.globalStructRange = [smin smax];
+    ST       = spm_read_vols(Vs);
+    smin = min(ST(:)); smax = max(ST(:)); st.globalStructRange = [smin smax];
     dims    = Vs.dim;            % update global dims
 
     % Update your slice‐slider limits
@@ -1847,7 +1847,7 @@ function buildBrainMesh()
     if isgraphics(old,'patch'), delete(old); end
 
     % ---------- 1) Isosurface in VOXELS (base surface) ----------
-    Scl = double(S); Scl(~isfinite(Scl)) = 0;
+    Scl = double(ST); Scl(~isfinite(Scl)) = 0;
     smin = min(Scl(:)); smax = max(Scl(:));
     pctList = [50 40 60 30 70 20 80];
     fv = struct('faces',[],'vertices',[]);
@@ -1931,8 +1931,8 @@ end
 function buildVolumetricMesh()
 
     % --- Assumes the following variables are in scope (nested function) ---
-    % S        : template brain volume (from spm_read_vols)
-    % T        : statistical volume (same space as S)
+    % ST        : template brain volume (from spm_read_vols)
+    % T        : statistical volume (same space as ST)
     % h3DAx    : handle to 3D axes
     % hasNeg, hasPos : booleans for bipolar/unipolar
     % hNegEdit, hPosEdit, hThrEdit : uicontrol handles for thresholds
@@ -2094,8 +2094,10 @@ function ensure3DScene()
     if ~isgraphics(h3DAx,'axes'), return; end
     set(h3DAx,'Visible','on');
 
-    % Early-out if a rotation is in progress (avoid rebuilds on mouse-up)
+    % Early-out if a rotation is in progress (avoid rebuilds on mouse-up)   
     if isappdata(h3DAx,'isRotating') && getappdata(h3DAx,'isRotating')
+        % Queue a rebuild request to be executed on rotate post-callback
+        setappdata(h3DAx,'pendingUpdate', true);
         return;
     end
 
@@ -2204,29 +2206,34 @@ function onRotatePostSafe(~, evd)
     ax = getValidAxes(evd);
     if isempty(ax), return; end
 
-    % Prevent recursion
+    % Clear rotation flag immediately so subsequent calls aren't trapped
+    if isappdata(ax,'isRotating'), setappdata(ax,'isRotating',false); end
+
     persistent inPost;
     if ~isempty(inPost) && inPost, return; end
     inPost = true;
 
     try
         S = guidata(ax);
-        % Bail if app state changed or axes not the one we manage
         if isempty(S) || ~isfield(S,'h3DAx') || ~ishandle(S.h3DAx) || ~isequal(ax,S.h3DAx)
             inPost = false; 
-            if isvalid(ax), rmappdata(ax,'isRotating'); end
             return;
         end
 
-        % Defer any heavy work — do NOT rebuild inline here
-        requestDeferredRedraw(S);
+        % Run only if something asked for a refresh during rotation
+        if isappdata(ax,'pendingUpdate') && getappdata(ax,'pendingUpdate')
+            rmappdata(ax,'pendingUpdate');
+            % Do your deferred/lightweight redraw (don’t block UI)
+            requestDeferredRedraw(S);
+            % If you prefer to force only the overlay update, call that here instead.
+            % refreshStatsOverlay(S);
+        end
 
     catch ME
         warning('overlay_nifti_gui:RotatePostError', ...
             'Rotate post-callback failed: %s', getReport(ME,'basic','hyperlinks','off'));
     end
 
-    if isvalid(ax), rmappdata(ax,'isRotating'); end
     inPost = false;
 end
 
@@ -3071,7 +3078,7 @@ function update3DColors(ax)
     try
         hTmp = patch('Faces',get(targetPatches,'Faces'),'Vertices',get(targetPatches,'Vertices'), ...
                      'Visible','off','Parent',ax);
-        isonormals(double(S), hTmp);
+        isonormals(double(ST), hTmp);
         vN = get(hTmp,'VertexNormals'); delete(hTmp);
         nv = sqrt(sum(vN.^2,2)); nv(nv==0)=1; vN = vN./nv;
         set(targetPatches, ...
@@ -3177,7 +3184,7 @@ function renderSingleSlice(ax, si, cmDiv, cmJet, N)
     % 5) Draw background + overlay
     cla(ax);
     if isoOn
-        B = computeStructuralBoundarySlice(S, viewmode, si);
+        B = computeStructuralBoundarySlice(ST, viewmode, si);
         hBkg = imagesc(A,'Parent',ax);
         set(hBkg,'HitTest','off','PickableParts','none');
         hold(ax,'on');
@@ -3346,11 +3353,11 @@ function [A, B] = extract_reorient_vols(si)
     % Extract & orient A,B
     switch viewmode
         case 'axial'
-            A = squeeze(S(:,:,si)); B = squeeze(T(:,:,si));
+            A = squeeze(ST(:,:,si)); B = squeeze(T(:,:,si));
         case 'sagittal'
-            A = flipud(squeeze(S(si,:,:))');  B = flipud(squeeze(T(si,:,:))');
+            A = flipud(squeeze(ST(si,:,:))');  B = flipud(squeeze(T(si,:,:))');
         case 'coronal'
-            A = flipud(squeeze(S(:,si,:))');  B = flipud(squeeze(T(:,si,:))');
+            A = flipud(squeeze(ST(:,si,:))');  B = flipud(squeeze(T(:,si,:))');
     end
 end
 
@@ -3490,10 +3497,10 @@ function B = computeROIBoundaryOnTheFly(AtlasOrig, Vs, VatOrig, viewmode, sliceI
 
 end
 
-function B = computeStructuralBoundarySlice(S, viewmode, sliceIdx)
+function B = computeStructuralBoundarySlice(ST, viewmode, sliceIdx)
 % COMPUTESTRUCTURALBOUNDARYSLICENOIP   Canny-style edges without IP toolbox
-%   B = computeStructuralBoundarySliceNoIP(S, viewmode, sliceIdx)
-%   S        : 3D structural volume
+%   B = computeStructuralBoundarySliceNoIP(ST, viewmode, sliceIdx)
+%   ST        : 3D structural volume
 %   viewmode     : 'axial' | 'sagittal' | 'coronal'
 %   sliceIdx : slice index in structural (voxel) space
 %
@@ -3502,12 +3509,12 @@ function B = computeStructuralBoundarySlice(S, viewmode, sliceIdx)
     %% 1) extract & orient slice
     switch viewmode
       case 'axial'
-        A = squeeze(S(:,:,sliceIdx));
+        A = squeeze(ST(:,:,sliceIdx));
       case 'sagittal'
-        tmp = squeeze(S(sliceIdx,:,:))';
+        tmp = squeeze(ST(sliceIdx,:,:))';
         A   = flipud(tmp);
       case 'coronal'
-        tmp = squeeze(S(:,sliceIdx,:))';
+        tmp = squeeze(ST(:,sliceIdx,:))';
         A   = flipud(tmp);
       otherwise
         error('Unknown viewmode "%s"',viewmode);

@@ -81,7 +81,7 @@ for n = 1:nM
     nmP = Fu(fVI);
     % Aggregated weight vector for this modality:
     nmW = zeros(numel(fVI),1); 
-    nmW(nmP) = W(lVI(lFuVI));
+    nmW(nmP) = W(fVI(lFuVI));
     if ~isempty(PA)
          nmPA = nan(numel(fVI),1); 
          nmPA(nmP) = PA(lFuVI);
@@ -299,20 +299,46 @@ for n = 1:nM
         % CORRELATION ANALYSIS
         %-----------------------------------------------------------
         if ~decompfl(n)
-            tY = zeros(size(Y,1), numel(nmP)); 
-            if nM > 1
-                % VI references the respective modality n.
-                tY(:,nmP) = Y(:, VI(Fu) == n); 
-            else
-                tY(:,nmP) = Y;
-            end
-            IN.zerooutflag = 1;
-            tY = nk_PerfZeroOut(tY, IN);
-            nmR  = nk_CorrMat(L, tY, 'pearson'); 
-            nmSR = nk_CorrMat(L, tY, 'spearman');
-            if ~memprob
-                nmC  = corrcoef(tY);
-            end
+            nmPx = Fu(fVI);
+           
+tY = zeros(size(Y,1), numel(nmPx));
+if nM > 1
+    % VI references the respective modality n.
+    tY(:, nmPx) = Y(:, VI(Fu) == n);
+else
+    tY(:, nmPx) = Y;
+end
+
+% Zero-out as before
+IN.zerooutflag = 1;
+tY = nk_PerfZeroOut(tY, IN);
+
+% Treat non-finites as missing for correlation
+tY(~isfinite(tY)) = NaN;
+L(~isfinite(L))   = NaN;
+
+% --- Robust correlations (pairwise deletion of NaNs) ---
+% Cross-corr between model weights L and tY
+nmR  = corr(L, tY, 'Type','Pearson',  'Rows','pairwise');
+nmSR = corr(L, tY, 'Type','Spearman', 'Rows','pairwise');
+
+% Within tY correlation (only if needed)
+if ~memprob
+    nmC = corr(tY, 'Type','Pearson', 'Rows','pairwise');
+
+    % OPTIONAL: neutralize constant-variance or all-NaN columns
+    % Use std with 'omitnan'. Note: std == NaN when a column is all NaN.
+    s        = std(tY, 0, 1, 'omitnan');     % row-wise=obs, col-wise=vars
+    allNaN   = all(isnan(tY), 1);
+    constCols = (s == 0) | allNaN;
+
+    if any(constCols)
+        nmC(constCols, :) = 0;
+        nmC(:, constCols) = 0;
+        d = 1:size(nmC,1);                   % nmC is square
+        nmC(d,d) = 1;                        % keep autocorr on diagonal
+    end
+end
         else
             % DR is active: Create correlation outputs as matrices with the same
             % number of columns (components) as nmW.
