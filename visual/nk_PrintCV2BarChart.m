@@ -13,6 +13,23 @@ else
     set(h,'Name', D.binwintitle);
 end
 
+% --- Screen size adjustment for MATLAB Online ---
+sz = get(0, 'ScreenSize');
+isMatlabOnline = strcmp(getenv('MW_DDUX_APP_NAME'), 'MATLAB_ONLINE');
+
+if isMatlabOnline
+    % Manually set a fixed size and center the window.
+    manual_width = 1200;
+    manual_height = 800;
+    pos_x = max( (sz(3) - manual_width) / 2, 1);
+    pos_y = max( (sz(4) - manual_height) / 2, 1);
+    fig_pos = [pos_x, pos_y, manual_width, manual_height];
+    
+    set(h, 'Units', 'pixels', 'Position', fig_pos);
+end
+% For desktop MATLAB, the default D.figuresz or existing position is used.
+
+
 % --- handle cache in appdata ---
 H = getappdata(h,'CV2Handles');
 if isempty(H), H = struct(); end
@@ -41,9 +58,9 @@ else
     tx = D.s;
 end
 % Update progress bar
-xlabel(H.prog_ax, tx);                                 
+xlabel(H.prog_ax, tx);
 pct = max(0,min(100, double(D.pltperc)));
-set(H.prog_bar, 'YData', pct, 'XData', 1);         
+set(H.prog_bar, 'YData', pct, 'XData', 1);
 
 % --- lock Y limits for all axes in this figure ---
 set(findall(h, 'type', 'axes'), 'YLimMode', 'manual');
@@ -59,7 +76,7 @@ end
 
 % --- stash and return (D stays without handles) ---
 setappdata(h,'CV2Handles', H);
-drawnow 
+drawnow
 end
 
 % -------------------------------------------------------------------------
@@ -108,17 +125,17 @@ for p = 1:numel(AxSpec)
             HP.legend = hl;
         end
         set(HP.ax,'FontWeight','demi','FontSize',9); box(HP.ax,'on');
-        xmax = size(A.val_y,1); 
+        xmax = size(A.val_y,1);
         if nclass>1
-            if size(A.val_y,1)==2 
-                xmax=1; 
+            if size(A.val_y,1)==2
+                xmax=1;
             elseif size(A.val_y,1) == 1
                 xmax=numel(A.val_y);
             end
         end
         xlim(HP.ax, [0.5, xmax+0.5]); ylim(HP.ax,  A.ylm);
         set(HP.ax,'XTick',1:numel(A.label),'XTickLabel',A.label,'XTickLabelRotation', 0);
-        title(HP.ax, A.title); ylabel(HP.ax, A.ylb); 
+        title(HP.ax, A.title); ylabel(HP.ax, A.ylb);
     else
         % update only: bars then errorbars
         if numel(HP.h_bar)>1
@@ -143,10 +160,10 @@ for p = 1:numel(AxSpec)
         % Keep axes tidy (labels/titles as you already re-apply after updates)
         set(HP.ax,'FontWeight','demi','FontSize',9); box(HP.ax,'on');
         set(HP.ax,'XTick',1:numel(A.label),'XTickLabel',A.label,'XTickLabelRotation', 0);
-        xmax = size(A.val_y,1); 
+        xmax = size(A.val_y,1);
         if nclass>1
-            if size(A.val_y,1)==2 
-                xmax=1; 
+            if size(A.val_y,1)==2
+                xmax=1;
             elseif size(A.val_y,1) == 1
                 xmax=numel(A.val_y);
             end
@@ -158,4 +175,3 @@ for p = 1:numel(AxSpec)
     H.(key){p} = HP;
 end
 end
-
