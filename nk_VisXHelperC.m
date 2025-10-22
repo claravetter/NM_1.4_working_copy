@@ -1117,17 +1117,9 @@ switch act
                     if size(Pcv2,1) < nRef, Pcv2(end+1:nRef, :) = NaN; elseif size(Pcv2,1) > nRef, Pcv2 = Pcv2(1:nRef,:); end
                     if size(Ccv2,1) < nRef, Ccv2(end+1:nRef, :) = NaN; elseif size(Ccv2,1) > nRef, Ccv2 = Ccv2(1:nRef,:); end
                     
-                    isAuto = [];
-                    if ~isempty(Pcv2)
-                        nColsCV1 = min(total_cols, size(Pcv2,2));     % columns processed so far in this CV2 fold
-                        if nColsCV1 >= 1
-                            cnt = sum(isfinite(Pcv2(:, 1:nColsCV1)), 2);   % finite p’s so far
-                            isAuto = (cnt == 1);                              % exactly one finite p
-                        else
-                            isAuto = false(size(Pcv2,1),1);
-                        end
-                    end
-                    
+                    % Determine "auto-correlation" rows by finding complete
+                    % non-finite rows in Ccv2
+                    isAuto = sum(isfinite(Ccv2),2)==0;
                     nRef_cv2 = nRef;
                     present_cv2 = zeros(nRef_cv2,1);
                     denom_cv2   = repmat(total_cols, nRef_cv2, 1);
@@ -1260,16 +1252,9 @@ switch act
                         if size(Pcv2,1) < nRef, Pcv2(end+1:nRef, :) = NaN; elseif size(Pcv2,1) > nRef, Pcv2 = Pcv2(1:nRef,:); end
                         if size(Ccv2,1) < nRef, Ccv2(end+1:nRef, :) = NaN; elseif size(Ccv2,1) > nRef, Ccv2 = Ccv2(1:nRef,:); end
                         
-                        isAuto = [];
-                        if ~isempty(Pcv2)
-                            nColsCV1 = min(total_cols, size(Pcv2,2));     % columns processed so far in this CV2 fold
-                            if nColsCV1 >= 1
-                                cnt = sum(isfinite(Pcv2(:, 1:nColsCV1)), 2);   % finite p’s so far
-                                isAuto = (cnt == 1);                              % exactly one finite p
-                            else
-                                isAuto = false(size(Pcv2,1),1);
-                            end
-                        end
+                        % Determine "auto-correlation" rows by finding complete
+                        % non-finite rows in Ccv2
+                        isAuto = sum(isfinite(Ccv2),2)==0;
 
                         total_cols = max(size(Pcv2,2), size(Ccv2,2));
                         present_cv2 = zeros(nRef,1);

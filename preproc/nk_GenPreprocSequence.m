@@ -39,7 +39,6 @@ if isfield(TemplParam,'ACTPARAM')
                 InputParam.P{ac}.LABELIMPUTE = TemplParam.ACTPARAM{ac}.LABELIMPUTE;
                 SrcParam.NaNflag = true;
                 InputParam.P{ac}.BINMOD = TemplParam.BINMOD;
-
                     
             case 'impute'
                 
@@ -662,9 +661,16 @@ if isfield(TemplParam,'ACTPARAM')
                 InputParam.P{ac}.SKEWCORR = TemplParam.ACTPARAM{ac}.SKEWCORR;
                 
                 % If there is a PX with hyperparams, copy them into InputParam.P{ac}.opt
-                if isfield(TemplParam.ACTPARAM{ac}, 'PX') && ~isempty(TemplParam.ACTPARAM{ac}.PX.opt)
+                % if isfield(TemplParam.ACTPARAM{ac}, 'PX') && ~isempty(TemplParam.ACTPARAM{ac}.PX.opt)
+                %     InputParam.P{ac}.opt = TemplParam.ACTPARAM{ac}.PX.opt;
+                %     InputParam.P{ac}.Params_desc = TemplParam.ACTPARAM{ac}.PX.Px.Params_desc;
+                % end
+
+                if isfield(TemplParam.ACTPARAM{ac},'PX') && ~isempty(TemplParam.ACTPARAM{ac}.PX)
                     InputParam.P{ac}.opt = TemplParam.ACTPARAM{ac}.PX.opt;
-                    InputParam.P{ac}.Params_desc = TemplParam.ACTPARAM{ac}.PX.Px.Params_desc;
+                    PX = nk_ReturnParamChain(TemplParam.ACTPARAM{ac});
+                    InputParam.P{ac}.Params = PX.Params;
+                    InputParam.P{ac}.Params_desc = PX.Params_desc;
                 end
        end
     end

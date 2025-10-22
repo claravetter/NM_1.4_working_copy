@@ -17,10 +17,10 @@
 %the top %N features are returned.
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%(c) Nikolaos Koutsouleris, 09 / 2015
+%(c) Nikolaos Koutsouleris, 10 / 2025
 function [AgreeFeat, AgreePerc] = ProbabilisticFea(F, EnsStrat, q)
 global VERBOSE
-%persistent h_probabilisticfea
+
 
 % Compute the features' between-classifier conistency
 % as percentage of between-classifier "agreement"

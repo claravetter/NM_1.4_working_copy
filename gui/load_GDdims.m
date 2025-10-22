@@ -188,14 +188,21 @@ if isfield(GDdims,'BinClass') || isfield(GDdims,'MultiClass')
         handles.MultiClass.probabilities            = GDdims.(fld).multi_probabilitiesCV2(indn , :, handles.curlabel);
         handles.MultiClass.onevsall_labels          = zeros(numel(indn),handles.ngroups);
         handles.MultiClass.onevsall_scores          = zeros(numel(indn),handles.ngroups);
-        uL = unique(handles.MultiClass.labels);
-        uL(isnan(uL)) = [];
-        for j = 1:handles.ngroups
-            ind = true(1,handles.ngroups); ind(j) = false;
-            probrest = nm_nanmean(handles.MultiClass.probabilities(:,ind),2);
-            handles.MultiClass.onevsall_labels(:,j) = handles.MultiClass.labels == uL(j);     
-            handles.MultiClass.onevsall_scores(:,j) = 1-probrest;
+
+        % Initialize
+        N = size(handles.MultiClass.labels ,1); K = handles.ngroups;
+        onevsall_labels = -ones(N, K);   % -1 for "rest", +1 for "class j"
+        onevsall_scores = nan(N, K);     % probability for class j
+    
+        % If your class indices align with columns 1..K, this is straightforward:
+        for j = 1:K
+            onevsall_labels(:, j) = 2*(handles.MultiClass.labels == j) - 1;   % +1 if label==j, else -1
+            onevsall_scores(:, j) = handles.MultiClass.probabilities(:, j);               % OvR probability = p_j
         end
+
+        handles.MultiClass.onevsall_labels = onevsall_labels;     
+        handles.MultiClass.onevsall_scores = onevsall_scores;
+        
         handles.MultiClass.onevsall_labels(handles.MultiClass.onevsall_labels == 0) = -1;
         for j = 1:handles.ngroups
             [handles.MultiClass.X{j}, ...

@@ -63,7 +63,7 @@ switch action
         targetscalestr = 'NA'; labelimputestr = 'NA';
         if isfield(params,'LABELMOD') 
             if isfield(params.LABELMOD,'TARGETSCALE') && ~isempty(params.LABELMOD.TARGETSCALE)
-                if params.LABELMOD.TARGETSCALE, 
+                if params.LABELMOD.TARGETSCALE
                     targetscalestr = 'Target scaling [0, 1]';
                 else
                     targetscalestr = '';
@@ -205,6 +205,8 @@ switch action
                                     impstr = sprintf('median of %g nearest neighbors (%s)',params.ACTPARAM{i}.IMPUTE.k, 'Jaccard');
                                 case 'hamming'
                                     impstr = sprintf('median of %g nearest neighbors (%s)',params.ACTPARAM{i}.IMPUTE.k, 'Hamming');
+                                case 'downshift'
+                                    impstr = 'Downshifted Gaussian imputation (left-censored)';
                                 case 'hybrid'
                                     impstr = sprintf('median of %g nearest neighbors (%s)',params.ACTPARAM{i}.IMPUTE.k, 'Hybrid');    
                                 otherwise

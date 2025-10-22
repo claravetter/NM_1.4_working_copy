@@ -18,7 +18,7 @@ switch handles.modeflag
          set(handles.tglSort,'Enable','on');
          set(handles.txtPretestProb,'Enable','on');
          set(handles.tglClrSwp,'Enable','on');
-         if ~isfield(handles,'params') || handles.params.probflag
+         if ~isfield(handles,'params') || (isfield(handles,'params') && handles.params.probflag)
             handles.tglP.Enable = 'off';
             handles.tglP.Value = 0;
          else

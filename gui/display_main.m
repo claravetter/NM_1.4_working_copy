@@ -24,13 +24,14 @@ switch h_list{h_val}
             handles.oocvview = false;
             handles.cmdExportCobWeb.Visible = 'on';
             handles.selOneVsAll_Info.Enable  = 'on';
+            set([handles.tglSort, handles.tglClrSwp, handles.tglP, handles.tglPercRank, handles.cmdPerfDCA, handles.cmdCalib], Enable='off');
             load_selYAxis(handles)
             load_selModelMeasures(handles)
-            
             handles = display_multiclassplot(handles);
             handles = sel_onevsone(handles, handles.selOneVsAll_Info);
             load_selCase(handles,handles.MultiClass.cases)
         else
+            set([handles.tglSort, handles.tglClrSwp, handles.tglP, handles.tglPercRank, handles.cmdPerfDCA, handles.cmdCalib], Enable='on');
             if isfield(handles,'MultiClass') && isfield(handles.MultiClass,'spideraxes') 
                 handles.MultiClass.spideraxes.Title.Visible='off';
             end

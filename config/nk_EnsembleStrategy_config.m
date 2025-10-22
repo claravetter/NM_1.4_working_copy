@@ -3,6 +3,7 @@ function param = nk_EnsembleStrategy_config(param, SVM, MODEFL, defaultsfl, pare
 % ----------------------- defaults -----------------------------------------
 Ensemble.type            = 0;
 Ensemble.Metric          = 2;
+Ensemble.Mode            = 3;              % hard-wired for Probabilistic Feature Extraction
 Ensemble.MinNum          = 1;
 Ensemble.Perc            = 75;
 Ensemble.DataType        = 2;
@@ -21,7 +22,6 @@ Ensemble.PerfSlackPct    = 0.0;             % fraction of metric range (e.g., 0.
 Ensemble.EntropyWeight   = 2.0;
 Ensemble.SizePenalty     = 0.0;
 Ensemble.Patience        = 0;
-
 SubSpaceStrategy = 1;
 SubSpaceCrit     = 0;
 act              = 0;
@@ -83,6 +83,12 @@ if ~defaultsfl
                 menustr = sprintf('%s|Set early-stop patience (steps, 0=off) [ %g ]', ...
                                   menustr, Ensemble.Patience);                                    menuact = [menuact 13];
                 menustr = sprintf('%s|Show quick help on regularizers', menustr);                 menuact = [menuact 14];
+            else
+                menustr = sprintf('%s|Set diversity epsilon ε (tolerance) [ %g ]', ...
+                                  menustr, Ensemble.DiversityEps);                                menuact = [menuact 15];
+                menustr = sprintf('%s|Set size penalty γ (0=off) [ %g ]', ...
+                                  menustr, Ensemble.SizePenalty);                                 menuact = [menuact 12];
+                menustr = sprintf('%s|Show quick help on diversity-only knobs', menustr);         menuact = [menuact 16];
             end
         end
 
@@ -252,6 +258,22 @@ if ~defaultsfl
             catch
                 fprintf('\n%s\n', txt);
             end
+        case 15  % ε for DiversityMax
+            Ensemble.DiversityEps = nk_input('Set diversity epsilon ε (tolerance)',0,'e',Ensemble.DiversityEps);
+        case 16  % quick help
+            txt = sprintf([ ...
+                'Diversity-only knobs (nk_DiversityMax)\n' ...
+                '-------------------------------------------------\n' ...
+                'ε (DiversityEps):\n' ...
+                '  • Acceptance tolerance (minimization): use strict cand < best − ε after MinNum.\n' ...
+                '  • Typical: 0.01–0.05 relative to your diversity scale.\n' ...
+                '\n' ...
+                'γ (SizePenalty):\n' ...
+                '  • Used in J(S) = D(S) + γ·log|S| (if you defined a size penalty in nk_DiversityMax).\n' ...
+                '  • Larger |S| increases J; set γ=0 to disable size term.\n' ...
+                '  • Typical: 0–0.1 relative to your diversity scale.\n' ...
+                ]);
+            try, helpdlg(txt,'Diversity-only guidance'); catch, fprintf('\n%s\n',txt); end
     end
 end
 
@@ -354,6 +376,8 @@ function Eout = local_overwrite_defaults(Def, In, MODEFL_)
     if ~isfield(Eout,'EntropyWeight')   || isempty(Eout.EntropyWeight),   Eout.EntropyWeight   = 2.0; end
     if ~isfield(Eout,'SizePenalty')     || isempty(Eout.SizePenalty),     Eout.SizePenalty     = 0.0; end
     if ~isfield(Eout,'Patience')        || isempty(Eout.Patience),        Eout.Patience        = 0;   end
+    if ~isfield(Eout,'DiversityEps') || isempty(Eout.DiversityEps), Eout.DiversityEps = 0.02; end
+
 end
 
 function s = local_pretty_divsrc(src)

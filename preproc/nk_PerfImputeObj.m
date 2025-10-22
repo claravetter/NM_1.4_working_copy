@@ -94,6 +94,9 @@ switch IN.method
         tX = IN.X(:,IN.blockind);
         ll = sum(isnan(stY(:)));
         stY = SeqkNNv2(stY, IN.k, tX);
+    
+    case 'downshift'
+        stY = lp_DownshiftGaussImp(stY);
 
     case {'euclidean','cityblock','seuclidean','cosine','mahalanobis','jaccard','hamming','hybrid'}
         tX = IN.X(:,IN.blockind);

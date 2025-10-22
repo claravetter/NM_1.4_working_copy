@@ -1061,19 +1061,21 @@ else
 end
 copyobj_subplot([handles.axes1 handles.legend_classplot h_md_anal], titl);
 
+% =========================================================================
 function [h_new, targ] = copyobj_subplot(obj, titl, targ, pos)
 
-if ~exist('targ','var') || isempty(targ),
+if ~exist('targ','var') || isempty(targ)
     targ = figure;
 end
 
 if ~exist('pos','var')
     pos = [0.12 0.15 0.85 0.7];
 end
-
 h_new = copyobj(obj,targ);
 h_new(1).Position = pos; 
 h_new(1).Title.String = titl;
+
+% =========================================================================
 
 % --- Executes on button press in cmdExportAxes2.
 function cmdExportAxes2_Callback(hObject, eventdata, handles)
@@ -1208,7 +1210,6 @@ function axes1_CreateFcn(hObject, eventdata, handles)
 % hObject    handle to selModelMeasures (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
-
 
 % --- Executes on selection change in selCVoocv.
 function selCVoocv_Callback(hObject, eventdata, handles)
@@ -1736,10 +1737,11 @@ Labels_oocv = []; Probs = []; Probs_oocv = []; Title = [];
 recompute = false;
 offsetIndex = 0;  % default offset removal
 
-if handles.params.probflag
+if handles.params.probflag || handles.one_vs_rest
     % Probabilistic algorithms do not require output calibration! 
     calibrationExists = true;
     defaultCalibrationMethod = methods{end};
+    Method=[];
 else
     % Check for existing calibration
     calibrationExists = isfield(handles.BinClass{handles.curclass},'Calibration'); 
@@ -1751,7 +1753,7 @@ else
 end
 
 % Interactive dialogue if method is not specified or calibration needed
-if (~exist('Method','var') || isempty(Method)) && ~handles.params.probflag
+if (~exist('Method','var') || isempty(Method)) && ~handles.params.probflag && ~handles.one_vs_rest
     fig = uifigure('Name','Calibration Method Selection','Position',[100 100 350 260]);
     % Calibration method dropdown
     ddl = uidropdown(fig,'Items',methods,'Position',[50 200 250 30],'Value',defaultCalibrationMethod);
@@ -1790,14 +1792,24 @@ if (~exist('Method','var') || isempty(Method)) && ~handles.params.probflag
 end
 
 % Training labels & scores
-Labels = handles.BinClass{handles.curclass}.labelh; Labels(Labels==-1)=0;
-DecisionScores = handles.BinClass{handles.curclass}.mean_predictions;
+if handles.one_vs_rest
+    Labels = handles.MultiClass.onevsall_labels(:,handles.selOneVsAll_Info.Value-1);
+    DecisionScores = handles.MultiClass.onevsall_scores(:,handles.selOneVsAll_Info.Value-1);
+else
+    Labels = handles.BinClass{handles.curclass}.labelh; Labels(Labels==-1)=0;
+    DecisionScores = handles.BinClass{handles.curclass}.mean_predictions;
+end
 if isfield(handles,'SubIndex'), SubI = handles.SubIndex; else, SubI = true(size(DecisionScores,1),1); end
 
 % Extract OOCV data if requested
 if handles.oocvview
     if isfield(handles,'MultiClass'), P_fld='MultiResults'; else, P_fld='BinResults'; end
-    Labels_oocv = handles.OOCV(handles.oocvind).data.(P_fld){1}.BinLabels{handles.curclass}; Labels_oocv(Labels_oocv==-1)=0;
+    [~,oocvind] = get_oocvind(handles);
+    labels_known = handles.OOCVinfo.Analyses{handles.curranal}.labels_known(oocvind);
+
+    if labels_known
+        Labels_oocv = handles.OOCV(handles.oocvind).data.(P_fld){1}.BinLabels{handles.curclass}; Labels_oocv(Labels_oocv==-1)=0;
+    end
     DecisionScores_oocv = handles.OOCV(handles.oocvind).data.(P_fld){1}.MeanCV2PredictedValues{handles.curclass};
 end
 
@@ -1820,8 +1832,8 @@ if handles.oocvview && offsetIndex>0
 end
 
 % Calibration and probability transform
-if ~handles.params.probflag
-    if ~strcmp(Method,'none')
+if ~handles.params.probflag && ~handles.one_vs_rest
+    if ~isempty(Method) && ~strcmp(Method,'none') 
         needsRecalc = recompute || ~calibrationExists || ~isequal(handles.BinClass{handles.curclass}.Calibration.SubI,SubI) ...
             ||  ~isequal(handles.BinClass{handles.curclass}.Calibration.Method, Method) ...
             || (handles.oocvview && (~isfield(handles.OOCV(handles.oocvind).data.(P_fld){1},'Calibration') ...
@@ -1856,13 +1868,20 @@ if ~handles.params.probflag
                     upsertProbsColumn(tbl, Probs_oocv, Method);
 
                 handles.OOCV(handles.oocvind).data.(P_fld){1} = Odata;
-                tLabels_oocv = handles.OOCV(handles.oocvind).data.(P_fld){1}.BinLabels{handles.curclass};
+                if labels_known
+                    tLabels_oocv = handles.OOCV(handles.oocvind).data.(P_fld){1}.BinLabels{handles.curclass};
+                end
+
                 if handles.selSubGroupOOCV.Value>1
+                if labels_known
                     tLabels_oocv = tLabels_oocv(SubI);
                     Labels_oocv = Labels_oocv(SubI);
+                end
                     Probs_oocv = Probs_oocv(SubI);
                 end
+                if labels_known
                 handles.OOCV(handles.oocvind).data.(P_fld){1}.contingency{1} = ALLPARAM(tLabels_oocv, Probs_oocv-0.5);
+                end
             end
         else
             % reuse existing
@@ -1908,19 +1927,25 @@ if ~handles.params.probflag
         Probs = DecisionScores;
         if handles.oocvview
             Probs_oocv = DecisionScores_oocv; 
+            if labels_known
             tLabels_oocv = handles.OOCV(handles.oocvind).data.(P_fld){1}.BinLabels{handles.curclass};
+            end
             if handles.selSubGroupOOCV.Value>1
-                tLabels_oocv = tLabels_oocv(SubI);
-                Labels_oocv = Labels_oocv(SubI);
+                if labels_known
+                    tLabels_oocv = tLabels_oocv(SubI);
+                    Labels_oocv = Labels_oocv(SubI);
+                end
                 DecisionScores_oocv = DecisionScores_oocv(SubI);
             end
+            if labels_known
             handles.OOCV(handles.oocvind).data.(P_fld){1}.contingency{1} = ALLPARAM(tLabels_oocv, DecisionScores_oocv);
+            end
         end
     end
 else
     % probflag case unchanged
     Title = handles.selAnalysis.String{handles.selAnalysis.Value};
-    Method = '';
+    Method = [];
     Probs = DecisionScores;
     if handles.oocvview, Probs_oocv = DecisionScores_oocv; end
     if max(Probs)<0.5, Probs = Probs + 0.5; end

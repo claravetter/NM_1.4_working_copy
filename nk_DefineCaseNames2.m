@@ -113,7 +113,7 @@ if exist('cases_comp','var') && ~isempty(cases_comp)
    
     for i=1:numel(cases)
         ii = strcmp(cases,cases_comp{i});
-        if ~any(ii),
+        if ~any(ii)
             mess = GenerateMessageEntry(mess, sprintf('Warning: Could not find case ''%s'' in the IDs of the new modality!',cases_comp{i}),'SystemCommands', 2); 
             cnt=cnt+1;
             continue

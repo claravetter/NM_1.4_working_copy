@@ -16,6 +16,8 @@ switch rowind
         handles.cmdExportCobWeb.Visible = 'on';
         handles.cmdMetricExport.Visible = 'off';
         handles.tblPerf.Visible = 'off';
+        handles.one_vs_rest = false;
+        set([handles.tglSort, handles.tglClrSwp, handles.cmdPerfDCA, handles.cmdCalib], Enable='off');
         
     otherwise
        
@@ -24,7 +26,7 @@ switch rowind
         handles.cmdMetricExport.Visible = 'on';
         handles.cmdExportCobWeb.Visible = 'off';
         handles.tblPerf.Visible = 'on';
-
+        
         %% Display ROC
         legend off 
         [handles.hroc, handles.hroc_random] = display_roc(handles, handles.MultiClass.onevsall_labels(:,rowind-1), handles.MultiClass.onevsall_scores(:,rowind-1));
@@ -34,7 +36,8 @@ switch rowind
         
         %% Display pie charts
         [handles.h1pie, handles.h2pie] = display_piecharts(handles);
-        
+        handles.one_vs_rest = true;
+        set([handles.tglSort, handles.tglClrSwp, handles.cmdPerfDCA, handles.cmdCalib], Enable='on');
 end
 %% Display confusion matrix
 handles.h_contig = display_contigplot(handles);

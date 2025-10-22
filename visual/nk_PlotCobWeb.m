@@ -1,6 +1,6 @@
 function [h, n_mat, ca, o] = nk_PlotCobWeb(mat, groupnames, ha)
 
-cla(ha);
+cla(ha); ha.Visible='on';
 ha.Position= [.12 .5 .7 .425];
 [M,N] = size(mat);
 idx = eye(M,N);

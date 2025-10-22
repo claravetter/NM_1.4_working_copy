@@ -10,9 +10,10 @@ ActStr = {'Tr', 'CV', 'TrCV', 'TrCVsep'};
 [Ynew, labelnew] = nk_ManageNanCases(Ynew, labelnew, [], 'prune_single');
 
 switch RFE.Wrapper.type
-    % GREEDY FORWARD/BACKWARD FEATURE SEARCH
+    % GREEDY FORWARD/BACKWARD FEATURE SEARCH (since NM 1.4: with adaptive
+    % versions)
     case 1 
-        funs = { @rfe_forward,  @rfe_backward };
+        funs = { @rfe_forward_v2,  @rfe_backward_v2 };
         [optparam, optind, optfound, optmodel] = funs{RFE.Wrapper.GreedySearch.Direction}( Y, label, Ynew, labelnew, Ps, SubFeat, FullParam, ActStr{RFE.Wrapper.datamode} );
     % SIMULATED ANNEALING
     case 2

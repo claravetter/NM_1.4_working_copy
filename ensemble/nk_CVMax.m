@@ -175,7 +175,7 @@ opt_hE = nk_EnsPerf(E, L);   orig_hE = opt_hE;
 if ~varflag
    opt_D  = nm_diversity_score(T, L, EnsStrat.DiversitySource);
 else
-    opt_D  = nk_RegAmbig(E, L);
+   opt_D  = nk_RegAmbig(E, L);
 end
 
 orig_D = opt_D;  orig_F = 1:k;
@@ -388,4 +388,13 @@ if VERBOSE
             strhdr, iter, orig_D, opt_D, nk_EnsPerf(E,L), opt_hE, k, numel(opt_F), rej_str);
 end
 
+end
+
+function v = local_getf(S, fname, default)
+%LOCAL_GETF  Safe struct field getter with default.
+    if isstruct(S) && isfield(S, fname) && ~isempty(S.(fname))
+        v = S.(fname);
+    else
+        v = default;
+    end
 end

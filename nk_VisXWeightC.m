@@ -86,7 +86,8 @@ for n = 1:nM
          nmPA = nan(numel(fVI),1); 
          nmPA(nmP) = PA(lFuVI);
     end
-    
+    corr_mask = Fu(fVI);
+
     %-----------------------------------------------------------
     % PROCESS DATA BACK TO INPUT SPACE
     %-----------------------------------------------------------
@@ -157,7 +158,7 @@ for n = 1:nM
                             nmPA = nmPA .* ax;
                         end
                     end
-                    
+
                 case {'reducedim','remvarcomp'}
                     % DR branch: perform component-wise back-projection.
                     if isfield(naPX,'recon') && naPX.recon==1
@@ -235,6 +236,7 @@ for n = 1:nM
                                 otherwise
                                     error('Reconstruction of data is not supported for this technique.');
                             end
+                            corr_mask = logical(mpp.vec * corr_mask(:));
                         end
                         
                         % Feature re-introduction: if features were removed prior to DR,
@@ -252,6 +254,11 @@ for n = 1:nM
                                 tmPA = zeros(length(naPX.indNonRem), size(nmW,2));
                                 tmPA(naPX.indNonRem, :) = nmPA;
                                 nmPA = tmPA;
+                            end
+                            if ~compwise
+                                tcorr_mask = false(length(naPX.indNonRem), 1);
+                                tcorr_mask(naPX.indNonRem) = corr_mask;
+                                corr_mask = tcorr_mask;
                             end
                         end
                         reducedimfl = true;
@@ -282,6 +289,11 @@ for n = 1:nM
                         tmPA = zeros(length(pIND), size(nmW,2));
                         tmPA(pIND, :) = nmPA;
                         nmPA = tmPA;
+                    end
+                    if ~compwise
+                        tcorr_mask = false(length(pIND), 1);
+                        tcorr_mask(pIND) = corr_mask;
+                        corr_mask = tcorr_mask;
                     end
                     % (Note: If needed, adjust the feature masks lFuVI, fVI here.)
             end
@@ -319,16 +331,18 @@ for n = 1:nM
             % Within tY correlation
             if ~memprob
                 nmC = corr(tY, 'Type','Pearson', 'Rows','pairwise');
-                % neutralize constant-variance or all-NaN columns
-                s        = std(tY, 0, 1, 'omitnan');     % row-wise=obs, col-wise=vars
-                allNaN   = all(isnan(tY), 1);
-                constCols = (s == 0) | allNaN;
-                if any(constCols)
-                    nmC(constCols, :) = 0;
-                    nmC(:, constCols) = 0;
-                    d = 1:size(nmC,1);                   % nmC is square
-                    nmC(d,d) = 1;                        % keep autocorr on diagonal
-                end
+            end
+            Rfull  = nan(size(nmW,1),1);
+            SRfull = nan(size(nmW,1),1);            
+            idx = find(corr_mask(:));          
+            Rfull(idx)  = nmR(nmPx).';     
+            SRfull(idx) = nmSR(nmPx).';
+            nmR  = Rfull;
+            nmSR = SRfull;
+            if ~memprob && ~isempty(nmC)
+                Cfull = nan(size(nmW,1));
+                Cfull(idx, idx) = nmC(nmPx, nmPx);
+                nmC = Cfull;
             end
         else
             % DR is active: Create correlation outputs as matrices with the same

@@ -31,6 +31,9 @@ switch lower(EnsStrat.DiversitySource)
             negED = max(-2, min(1, opt_D));  % since -ED ∈ [-2,1]
             opt_D = (negED + 2) / 3;         % -ED [-2,1] -> Dnorm [0,1]
         end
+    case 'entropy'
+        opt_D = -opt_D;
+
 end
 
 

@@ -64,7 +64,6 @@ if isfield(IO,'label') && sum(any(isnan(IO.label)))>0
     IO.nangroup = 1; IO.nan_subjects = sum(sum(isnan(IO.label),2));
 end
 
-
 labelmanage = {'add to existing','overwrite existing','skip'};
 delimiters = {'comma','semi','space','tab','bar'};
 globals = {'no globals','user-defined','computed by SPM'};
@@ -955,6 +954,7 @@ switch act
         end
         
     case 'sel_img'
+
         if varind > 1 && ~any(isinf(IO.n_subjects)), t_n_samples = 1; else, t_n_samples = n_samples; end
         IO.PP = []; t_n_subjects = nan(1, t_n_samples);
         for i=1:t_n_samples
@@ -1059,18 +1059,15 @@ switch act
         if iscell(label_edit), label_edit = strjoin(label_edit,','); end
         label_edit = nk_input(sprintf('Define labels: %s in %s',groupmode_varstr, groupmode_str),0,'s', label_edit);
         t_label_edit = strsplit(label_edit,',');
-        if numel(t_label_edit)==1
+        if isscalar(t_label_edit)
             label_edit = deblank(char(t_label_edit));
         else
             label_edit = regexprep(t_label_edit,',','');
             label_edit = regexprep(label_edit,' ','');
         end
         IO.label_edit = label_edit;
-
-        
-        
-
-        case 'def_cases'
+    
+    case 'def_cases'
         case_edit = nk_input(sprintf('Define cases: %s in %s', groupmode_varstr, groupmode_str),0,'s', case_edit);
        
         %if ~strcmp(case_edit,IO.case_edit), IO.reread_mat = true; end
@@ -1147,6 +1144,7 @@ switch act
         drawnow
         
  case 'disp_img'
+     
         nk_PrintLogo
         if iscell(IO.PP), PP = char(IO.PP); F = char(IO.F); else, PP= IO.PP; F=IO.F; end
         fprintf('\n\n'); fprintf('Found %g image files in setup:',size(PP,1));
@@ -1253,8 +1251,16 @@ switch act
                         if strcmp(IO.modeflag,'regression') && strcmp(datasource,'nifti') && IO.labels_known
                             IO.L = evalin('base',IO.label_edit); 
                         end
-                        %[IO.ID, IO.files] = nk_DefineCaseNames2(IO.PP, sum(IO.n_subjects_all));
                         IO = DefineLabels(IO, modeflag);
+                    end
+                    % If you don't find any ID here try to create the ID
+                    % field now
+                    if ~isfield(IO,'ID') || isempty(IO.ID)
+                        try
+                            [IO.ID, IO.files] = nk_DefineCaseNames2(IO.PP, sum(IO.n_subjects_all));
+                        catch
+                            fprintf('\nUnable to generate IDs from these images.')
+                        end
                     end
                     
                 case 'surf'
@@ -1265,7 +1271,15 @@ switch act
                     % Read in label from workspace in case of regression
                     if strcmp(IO.modeflag,'regression'), IO.L = evalin('base',IO.label_edit); end
                     IO = DefineLabels(IO, modeflag);
-                   
+                    % If you don't find any ID here try to create the ID
+                    % field now
+                    if ~isfield(IO,'ID') || isempty(IO.ID)
+                        try
+                            [IO.ID, IO.files] = nk_DefineCaseNames2(IO.PP, sum(IO.n_subjects_all));
+                        catch
+                            fprintf('\nUnable to generate IDs from these images.')
+                        end
+                    end
                 case 'matrix'
                     [IO, mess] = ReadTabular(IO, groupmode, mess);
                    

@@ -28,7 +28,7 @@ if act < 10
     for i=1:inp.nummodal
         availstr = 'available';
 
-        if ~isfield(datacontainer,'Y')  || (ischar(datacontainer.Y) && i>1) || (iscell(datacontainer.Y) && (numel(datacontainer.Y)<= i || isempty(datacontainer.Y{i})))
+        if ~isfield(datacontainer,'Y')  || (ischar(datacontainer.Y) && i>1) || (iscell(datacontainer.Y) && isempty(datacontainer.Y{i}))
             availstr = 'not loaded';
         elseif isfield(datacontainer,'Y') 
             if iscell(datacontainer.Y) 

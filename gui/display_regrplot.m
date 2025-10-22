@@ -260,14 +260,13 @@ axes(handles.axes5)
 if isfield(handles,'txtPerf'); delete(handles.txtPerf); end
   
 if binarizeflag
-    % Binarize at median
+    
+    m = nm_nanmean(pred); set(handles.txtBinarize,'String',m);
+    % Binarize at mean
     if isempty(handles.txtBinarize.String) || strcmp(handles.txtBinarize.String,'Binarization Threshold')
         if isfield(handles,'binarize_hline')
             delete(handles.binarize_hline); 
             delete(handles.binarize_vline); 
-            return
-        else
-            m = nm_nanmean(pred); set(handles.txtBinarize,'String',m);
         end
     else
         m = str2double(handles.txtBinarize.String);

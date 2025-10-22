@@ -6,7 +6,7 @@ function handles = display_contigmat(handles, contigmat)
     %% 1) Build labels & values (always in parallel)
     labels = {};
     values = {};
-  
+    cla(handles.axes5);
     GraphType = get(handles.selYaxis,'Value');
     
     if ~exist('contigmat','var') || isempty(contigmat)
@@ -109,7 +109,7 @@ function handles = display_contigmat(handles, contigmat)
     % Check if the table already exists & is valid
     if isfield(handles, 'tblPerf') && isvalid(handles.tblPerf)
         % Just update its contents
-        set(handles.tblPerf, 'Data', fullData);
+        set(handles.tblPerf, 'Data', fullData,'Visible','on');
     else
         % Create it for the first time
         handles.tblPerf = uitable( ...

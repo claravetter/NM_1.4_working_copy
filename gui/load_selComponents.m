@@ -8,7 +8,7 @@ function load_selComponents(hDropdown, visData, curclass, curmod)
 %   curmod    : current modality index
 
 if nargin < 4, curmod = 1; end
-if ~isfield(visData,'Report')
+if ~isfield(visData,'Report') || ~isfield(visData.Report{curclass},'components')
     set(hDropdown, 'String', {'<no components available>'}, ...
                            'Enable','off', 'Value',1, 'UserData',[]);
     return
@@ -59,8 +59,7 @@ for ii = 1:nKept
     if ~isempty(meanCorr), cc = meanCorr(ii);   end
 
     if ~isempty(meanPval) && isfinite(meanPval(ii))
-        pv = meanPval(ii);
-        if pv < .001, ptxt = sprintf('p<%.3f', pv); else, ptxt = sprintf('p=%.3f', pv); end
+        ptxt = sprintf('-log10(p)=%.3f', meanPval(ii)); 
         items{ii+1} = sprintf('Component #%d: pres=%1.1f%% | avg corr=%.3f | %s', idxs(ii), sf, cc, ptxt);
     else
         items{ii+1} = sprintf('Component #%d: pres=%1.1f%% | avg corr=%.3f', idxs(ii), sf, cc);

@@ -746,21 +746,10 @@ end
 %%%% GROUP PROCESSING MODE (if multi-class available) %%%%
 function CURACT = config_binmod(NM, label, CURACT)
 
-% Default parameter
-if isfield(CURACT,'BINMOD') && ~isempty(CURACT.BINMOD)
-    switch CURACT.BINMOD, case 1, tBINMOD = 1; case 0, tBINMOD = 2; case 2, tBINMOD = 3; end
-else
-    if max(label(:,1))>2 && strcmp(modeflag,'classification') 
-        tBINMOD = 0; % Multi-group
-    else
-        tBINMOD = 1; % Binary mode
-    end
-end
-
 if max(label(:,1))<=2 || ~strcmp(NM.modeflag,'classification')
     CURACT.BINMOD = 1;
 else
-    CURACT.BINMOD = nk_input('Group processing mode',0, 'm', 'binary|multi-group',[1,0], tBINMOD);
+    CURACT.BINMOD = ~CURACT.BINMOD;
 end
 
 end

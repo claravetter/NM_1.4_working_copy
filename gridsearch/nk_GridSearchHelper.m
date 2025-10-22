@@ -70,9 +70,9 @@ if (Param.flag && Param.SubSpaceFlag ) && (isfield(Param,'EnsembleStrategy') && 
     GD.SD_DivT(idx_selected,:,curlabel)   = Perf.Ens_SDTrDiv;
     GD.M_DivV(idx_selected,:,curlabel)    = Perf.Ens_MeanCVDiv;
     GD.SD_DivV(idx_selected,:,curlabel)   = Perf.Ens_SDCVDiv;
-    flg = true;     
+    hasDiversity = true;     
 else
-    flg = false;
+    hasDiversity = false;
 end
 
 % multi-group:
@@ -98,7 +98,7 @@ if MULTI.flag
     end
     GD.MultiERR(idx_selected,curlabel)    = GD.MultiTR(idx_selected) - GD.MultiTS(idx_selected);
 
-   if flg
+   if hasDiversity
         GD.MultiM_DivT(idx_selected,curlabel)     = Perf.Ens_MeanMultiTrDiv;
         GD.MultiSD_DivT(idx_selected,curlabel)    = Perf.Ens_SDMultiTrDiv;
         GD.MultiM_DivV(idx_selected,curlabel)     = Perf.Ens_MeanMultiCVDiv;
@@ -130,7 +130,7 @@ GD.CV2DivDec(idx_selected,:,curlabel) = CV2Perf.binCV2Diversity_DecValues;
 
 % Model params
 GD.FEAT{idx_selected,curlabel}        = Perf.SubSpaces;
-if flg
+if hasDiversity
     GD.Weights{idx_selected,curlabel} = Perf.Weights;
 end
 GD.DT{idx_selected,curlabel}          = Perf.TrDecisionValues;
@@ -196,7 +196,7 @@ if ~BATCH
             lg_long{1} = sprintf('M #%g: %s',1,'Regression');
             lg_short{1} = sprintf('M #%g',1);
     end
-    % Create position vectors depending on MULTI and flg
+    % Create position vectors depending on MULTI and hasDiversity
     if MULTI.flag
         figuresz(end) = 0.8*sz(end);
         height  = 0.35; bottom  = 0.47;
@@ -206,22 +206,22 @@ if ~BATCH
         height = 0.70; bottom = 0.1;
     end
 
-    if flg
+    if hasDiversity
         figuresz(end-1) = 0.75*sz(end-1);
         if hasComplexity
-            widthperf = 0.4;
+            widthperf = 0.45;
             pos1 = [lefti   bottom  widthperf    height];   % Performance axes
             pos2 = [0.60    bottom  wideelse     height];   % Complexity axes
             pos3 = [0.80    bottom  wideelse     height];   % Diversity axes
         else
-            widthperf = 0.6;
+            widthperf = 0.65;
             pos1 = [lefti   bottom  widthperf    height];   % Performance axes
             pos3 = [0.80    bottom  wideelse     height];   % Diversity axes
         end
     else
         figuresz(end-1) = 0.5*sz(end-1);
         if hasComplexity
-            widthperf = 0.6;
+            widthperf = 0.65;
             pos1 = [lefti   bottom  widthperf    height];   % Performance axes
             pos2 = [0.80    bottom  wideelse     height];   % Complexity axes
         else
@@ -231,12 +231,14 @@ if ~BATCH
     end
 
     if MULTI.flag
-        posm1 = [ lefti   bottomm widthperf height ];  %
-        if flg
+        if hasDiversity
+            widthperf = 0.65;
             posm2 = [ 0.8 bottomm wideelse height ];
         else
+            widthperf = 0.85;
             posm2 = [];
         end
+        posm1 = [ lefti bottomm widthperf height ];  %
     end
     DISP.figuresz = figuresz;
     ex = '';
@@ -263,8 +265,8 @@ if ~BATCH
     meanc       = GD.C(idx_selected,:);
     stdc        = zeros(size(meanc));
     if DISP.nclass > 1
-        meanc=[meanc;zeros(1,DISP.nclass)];
-        stdc = [stdc;zeros(1,DISP.nclass)];
+         meanc=[meanc;zeros(1,DISP.nclass)];
+         stdc = [stdc;zeros(1,DISP.nclass)];
     end
     xaxc        = ' ';
     DISP.ax{1}.val_y = meanvec;
@@ -290,7 +292,7 @@ if ~BATCH
         cnt=2;
     end
 
-    if flg % Ensemble method
+    if hasDiversity % Ensemble method
         meandiv = zeros(2,nclass); stddiv=zeros(2,nclass);
         meandiv(1,:)         = Perf.Ens_MeanCVDiv;
         meandiv(2,:)         = CV2Perf.binCV2Diversity_Targets;
@@ -329,7 +331,7 @@ if ~BATCH
             DISP.m_ax{1}.title = 'Multi-Class Performance';
             DISP.m_ax{1}.position = posm1;
             DISP.m_ax{1}.lg = [];
-            if flg
+            if hasDiversity
                 DISP.m_ax{2}.val_y  = [GD.MultiM_DivT(idx_selected)         GD.MultiM_DivV(idx_selected)         GD.MultiCV2Div(idx_selected)];
                 DISP.m_ax{2}.std_y  = [GD.MultiSD_DivT(idx_selected)        GD.MultiSD_DivV(idx_selected)        0]; 
                 DISP.m_ax{2}.label  = {'Tr Div','CV1 Div', 'CV2 Div'};

@@ -291,7 +291,6 @@ for i=1:IN.nperms % loop through CV1 permutations
                                                     OUT.TrHT{i,j,curclass} = OUT.TrHT{i,j,curclass}(:,tkInd);
                                             end
                                             
-                                            OUT.TrDiv(i,j,curclass)     = Hx_div;
                                             % Extract base classifiers from
                                             % CV1 test ensemble according to tkInd 
                                             OUT.CVHD{i,j,curclass}       = OUT.CVHD{i,j,curclass}(:,tkInd); 
@@ -301,28 +300,26 @@ for i=1:IN.nperms % loop through CV1 permutations
                                             OUT.CVHTperf(i,j,curclass)   = nk_EnsPerf( OUT.CVHT{i,j,curclass}, CVL{curclass} );
                                             % Compute entropy of optimized CV1 test data ensemble
                                             OUT.CVDiv(i,j,curclass) = save_binary_div( Param, OUT.CVHT{i,j,curclass}, CVL{curclass} );
-                                            
+                                            OUT.TrDiv(i,j,curclass) = save_binary_div( Param, OUT.TrHT{i,j,curclass}, TrL{curclass});
+
                                         case 2 % Use CV1 test data for ensemble construction
                                             % Only for binary optimization: Use CV1-test data to optimize ensemble components
                                             Lx = CVL{curclass};
                                             
                                             switch Metric
                                                 case 1
-                                            
                                                     Px = OUT.CVHT{i,j,curclass}; 
                                                     [tkInd, Hx_perf, Hx, Hx_div ] = nk_BuildEnsemble(Px, Lx, Param.EnsembleStrategy,[], ngroups);
                                                     OUT.CVHTperf(i,j,curclass) = Hx_perf; OUT.CVHT{i,j,curclass} = Hx;
                                                     OUT.CVHD{i,j,curclass} = OUT.CVHD{i,j,curclass}(:,tkInd);
                                                     
-                                                case 2
-                                                    
+                                                case 2                       
                                                     Px = OUT.CVHD{i,j,curclass}; 
                                                     [ tkInd, Hx_perf, Hx, Hx_div ] = nk_BuildEnsemble(Px, Lx, Param.EnsembleStrategy,[],ngroups);
                                                     OUT.CVHDperf(i,j,curclass)  = Hx_perf; OUT.CVHD{i,j,curclass}      = Hx;  
                                                     OUT.CVHT{i,j,curclass} = OUT.CVHT{i,j,curclass}(:,tkInd);
                                             end
                                             
-                                            OUT.CVDiv(i,j,curclass)     = Hx_div;    
                                             % Extract base classifiers from
                                             % CV1 training ensemble according to tkInd 
                                             OUT.TrHD{i,j,curclass}       = OUT.TrHD{i,j,curclass}(:,tkInd); 
@@ -332,6 +329,7 @@ for i=1:IN.nperms % loop through CV1 permutations
                                             OUT.TrHTperf(i,j,curclass)   = nk_EnsPerf( OUT.TrHT{i,j,curclass}, TrL{curclass} );
                                             % Compute entropy of optimized CV1 training data ensemble
                                             OUT.TrDiv(i,j,curclass) = save_binary_div( Param, OUT.TrHT{i,j,curclass}, TrL{curclass});
+                                            OUT.CVDiv(i,j,curclass) = save_binary_div( Param, OUT.CVHT{i,j,curclass}, CVL{curclass});
                                             
                                         case 3 % Use CV1 training & test data for ensemble construction
                                              
@@ -423,7 +421,7 @@ for i=1:IN.nperms % loop through CV1 permutations
                                         [tkInd, ...
                                             OUT.mTrPerf(i,j), ...
                                             ~, ...
-                                            OUT.mTrDiv(i,j), ...
+                                            ~, ...
                                             tkIndCat, ...
                                             OUT.mTrPred{i,j}] = ...
                                                         nk_BuildEnsemble(mTr, IN.Y.mTrL{i,j}(:,MULTILABEL.curdim), Param.EnsembleStrategy, mC, ngroups);
@@ -431,14 +429,15 @@ for i=1:IN.nperms % loop through CV1 permutations
                                         % Compute CV1-test data multi-group performance:
                                         [OUT.mCVPerf(i,j), OUT.mCVPred{i,j}] = nk_MultiEnsPerf(mCV(:,tkIndCat), sign(mCV(:,tkIndCat)), IN.Y.mCVL{i,j}(:,MULTILABEL.curdim), mC(tkIndCat), ngroups);
                                         
-                                        % Compute CV1-test data ensemble entropy:
+                                        % Compute CV1-train/test data ensemble entropy:
                                         OUT.mCVDiv(i,j) = compute_diversity(IN, Param, tkInd, mCV, CVL);
-                                    
+                                        OUT.mTrDiv(i,j) = compute_diversity(IN, Param, tkInd, mTr, TrL);
+
                                     case 2 % CV1-Test Data
                                         [tkInd, ...
                                             OUT.mCVPerf(i,j), ...
                                             ~, ...
-                                            OUT.mCVDiv(i,j), ...
+                                            ~, ...
                                             tkIndCat,...
                                             OUT.mCVPred{i,j}] = ...
                                                         nk_BuildEnsemble(mCV, IN.Y.mCVL{i,j}(:,MULTILABEL.curdim), Param.EnsembleStrategy, mC, ngroups);
@@ -449,6 +448,7 @@ for i=1:IN.nperms % loop through CV1 permutations
 
                                         % Compute CV1-training data ensemble entropy:
                                         OUT.mTrDiv(i,j) = compute_diversity(IN, Param, tkInd, mTr, TrL);
+                                        OUT.mCVDiv(i,j) = compute_diversity(IN, Param, tkInd, mCV, CVL);
                                 end
 
                                 % Apply tkInd to dichotomization info
@@ -581,7 +581,7 @@ for q = 1:IN.nclass
 
     % use hard predictions where needed
     Tsub = sign(Esub);
-    Tsub(Tsub==0) = -1;     % NM convention
+    Tsub(Tsub==0) = -1;
 
     Lsub = Lq(mask);        % binary {-1,+1}
 

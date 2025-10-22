@@ -106,17 +106,7 @@ if ~isfield(EnsStrat,'OptInlineFunc1') || isempty(EnsStrat.OptInlineFunc1) || ..
     end
 end
 
-% --- Helpers ---------------------------------------------------------------
-    function D = class_diversity(Psub, Lsub, Csub, src)
-        % mean over present classes; each term in [0,1], higher=better
-        classes_here = unique(Csub(:))';
-        vals = zeros(numel(classes_here),1);
-        for cc = 1:numel(classes_here)
-            cur = classes_here(cc);
-            vals(cc) = diversity_one_class(Psub, Lsub, Csub, src, cur);
-        end
-        D = mean(vals,'omitnan');
-    end
+% --- Helpers --------------------------------------------------------------
 
     function mask = perf_slack_mask(vals)
         if isempty(vals), mask = false(size(vals)); return; end
@@ -409,4 +399,15 @@ for j=1:n
     pos = (T(:,j) > 0);
     if any(pos), P(pos,j) = cj; end
 end
+end
+
+function D = class_diversity(Psub, Lsub, Csub, src)
+    % mean over present classes; each term in [0,1], higher=better
+    classes_here = unique(Csub(:))';
+    vals = zeros(numel(classes_here),1);
+    for cc = 1:numel(classes_here)
+        cur = classes_here(cc);
+        vals(cc) = diversity_one_class(Psub, Lsub, Csub, src, cur);
+    end
+    D = mean(vals,'omitnan');
 end

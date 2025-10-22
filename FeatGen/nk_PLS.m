@@ -50,7 +50,7 @@ if ~IN.trained % No LV projection parameters found => compute mpp
             % Build covariance matrix S
             S=mXd'*mY;
             % Decompose S into LVpairs
-            [IN.mpp.u, IN.mpp.s, IN.mpp.v] = svd(S',0);
+            [IN.mpp.u, IN.mpp.s, IN.mpp.v] = svd(S','econ');
             IN.mpp.d = diag(IN.mpp.s)';
         case 'spls'
             % Perform sparse PLS

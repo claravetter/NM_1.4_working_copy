@@ -1,192 +1,161 @@
 function D = nk_PrintCV2BarChart(D, multiflag)
-global OCTAVE
+% Minimal refactor: cache handles in figure appdata and only update data.
 
 WinTag = 'PrintCVBarsBin';
 
-% Check for existing figure using D.h if available and valid.
-if isfield(D,'h') && ishandle(D.h)
-    h = D.h;
-    set(0, 'CurrentFigure', h);
+% --- figure (create or find) ---
+h = findobj(0,'Type','figure','Tag',WinTag);
+if isempty(h) || ~ishandle(h)
+    h = figure('Name', D.binwintitle, ...
+        'NumberTitle','off', 'Tag', WinTag, ...
+        'MenuBar','none', 'Position', D.figuresz, 'Color',[0.9 0.9 0.9]);
 else
-    % Try to find an existing figure by tag.
-    h = findobj('Tag', WinTag);
-    if isempty(h)
-        h = figure('Name', D.binwintitle, ...
-            'NumberTitle', 'off', ...
-            'Tag', WinTag, ...
-            'MenuBar', 'none', ...
-            'Position', D.figuresz, ...
-            'Color', [0.9 0.9 0.9]);
-    end
-    D.h = h;
-    set(0, 'CurrentFigure', h);
+    set(h,'Name', D.binwintitle);
 end
 
-% Update figure name (but do not clear the whole figure)
-set(h, 'Name', D.binwintitle);
+% --- handle cache in appdata ---
+H = getappdata(h,'CV2Handles');
+if isempty(H), H = struct(); end
 
-% === Top Axes for Progress Bar ===
-if ~isfield(D, 'hl') || ~ishandle(D.hl)
-    hl = findobj('Tag', 'CurrParam');
-    if isempty(hl)
-        D.hl = axes('Parent', h, 'Position', [0.1 0.95 0.85 0.025], ...
-            'Tag', 'CurrParam', 'Visible', 'on', 'YTick', []); 
-    else
-        D.hl = hl(1);  % In case more than one exists, pick the first.
-    end
+%% === Top progress bar (create once, then update) ===
+if ~isfield(H,'prog_ax') || ~ishandle(H.prog_ax)
+    H.prog_ax = axes('Parent', h, 'Position', [0.1 0.95 0.85 0.025], ...
+        'Tag', 'CurrParam', 'Visible','on', 'YTick', [], 'Box','on');
 end
-set(h, 'CurrentAxes', D.hl);
-cla(D.hl);  % Clear only the progress bar axes
-barh(D.hl, 1, D.pltperc, 'FaceColor', 'b','EdgeColor','none');
-hold(D.hl, 'on');
-
-% Build the label string
+if ~isfield(H,'prog_bar') || ~ishandle(H.prog_bar)
+    H.prog_bar = barh(H.prog_ax, 1, 0, 'FaceColor','b', 'EdgeColor','none');
+    xlim(H.prog_ax,[0 100]); ylim(H.prog_ax,[0.5 1.5]); set(H.prog_ax,'YTick',[]);
+end
+% Build label text (unchanged from your code, simplified)
 if ~isempty(D.Pdesc{1})
     tx = sprintf('%s\nParams: ', D.s);
     txi = '';
     for j = 1:numel(D.Pdesc{1})
-        if iscell(D.P{1}(j))
-            ParVal = D.P{1}{j};
-        else
-            ParVal = D.P{1}(j);
-        end
-        if isnumeric(ParVal)
-            ParVal = num2str(ParVal, '%g');
-        end
-        txi = [txi sprintf('%s = %s, ', D.Pdesc{1}{j}, ParVal)];
+        ParVal = D.P{1}(j);
+        if iscell(ParVal), ParVal = ParVal{1}; end
+        if isnumeric(ParVal), ParVal = num2str(ParVal,'%g'); end
+        txi = [txi sprintf('%s = %s, ', D.Pdesc{1}{j}, ParVal)]; %#ok<AGROW>
     end
-    tx = [tx txi(1:end-2)]; % Remove the trailing comma
+    if ~isempty(txi), tx = [tx txi(1:end-2)]; else, tx = D.s; end
 else
     tx = D.s;
 end
+% Update progress bar
+xlabel(H.prog_ax, tx);                                 
+pct = max(0,min(100, double(D.pltperc)));
+set(H.prog_bar, 'YData', pct, 'XData', 1);         
 
-% Update or create the xlabel for the progress bar axes
-if ~isfield(D, 'hl_xlabel') || ~ishandle(D.hl_xlabel)
-    % Create and store the xlabel handle if it does not exist
-    D.hl_xlabel = xlabel(D.hl, tx);
-else
-    % Just update the existing xlabel text
-    set(D.hl_xlabel, 'String', tx);
+% --- lock Y limits for all axes in this figure ---
+set(findall(h, 'type', 'axes'), 'YLimMode', 'manual');
+
+%% === Main bar panels ===
+H = ensureAndUpdatePanels(h, H, D.ax, D.nclass, 'ax');
+
+%% === Multi panels (optional) ===
+if multiflag && isfield(D,'m_ax') && ~isempty(D.m_ax)
+    H = ensureAndUpdatePanels(h, H, D.m_ax, D.nclass, 'm_ax');
+    ylim(H.m_ax{1}.ax,[0 100]);
 end
 
-xlim(D.hl, [0 100]);
-hold(D.hl, 'off');
+% --- stash and return (D stays without handles) ---
+setappdata(h,'CV2Handles', H);
+drawnow 
+end
 
-% === Loop over individual axes for bar plots ===
-for p = 1:numel(D.ax)
+% -------------------------------------------------------------------------
+function H = ensureAndUpdatePanels(hFig, H, AxSpec, nclass, key)
+if ~isfield(H,key) || ~iscell(H.(key))
+    H.(key) = cell(1, numel(AxSpec));
+end
 
-    if ~isfield(D.ax{p}, 'h') || ~ishandle(D.ax{p}.h)
+for p = 1:numel(AxSpec)
+    A = AxSpec{p};
+    if p > numel(H.(key)) || isempty(H.(key){p})
+        H.(key){p} = struct();
+    end
+    HP = H.(key){p};
 
-        ha = findobj(h, 'Tag', D.ax{p}.title);
-        if isempty(ha)
-            D.ax{p}.h = axes('Parent', h, 'Position', D.ax{p}.position, 'Tag', D.ax{p}.title);
+    % axes (create once)
+    if ~isfield(HP,'ax') || ~ishandle(HP.ax)
+        ax = findobj(hFig,'Type','axes','Tag',A.title);
+        if isempty(ax), HP.ax = axes('Parent', hFig, 'Position', A.position, 'Tag', A.title);
+        else,           HP.ax = ax(1);
+        end
+        ylabel(HP.ax, A.ylb); title(HP.ax, A.title);
+        if isempty(A.ylm)
+            vals = A.val_y(:); vals = vals(isfinite(vals));
+            if isempty(vals), ylm=[0 1]; else, ylm=[min(vals) max(vals)]; end
+            if ylm(1)==ylm(2), ylm=ylm+[-0.5 0.5]; end
         else
-            D.ax{p}.h = ha;
+            ylm = A.ylm;
         end
-        cla(D.ax{p}.h);
+    end
 
-        % Create the bar and error plots
-        [D.ax{p}.h_bar, D.ax{p}.err_bar] = barwitherr(D.ax{p}.std_y, D.ax{p}.val_y); 
-        hold(D.ax{p}.h, 'on');
-        set(D.ax{p}.h, 'FontWeight', 'bold', 'FontSize', 10);
-        box(D.ax{p}.h, 'on');
-        if D.nclass == 1
-            set(D.ax{p}.h_bar, 'FaceColor', D.ax{p}.fc);
-        end
-        set(D.ax{p}.h_bar, 'EdgeColor', 'none');
-        set(get(D.ax{p}.h, 'YLabel'), 'String', D.ax{p}.ylb);
+    % graphics (create once)
+    needCreate = ~isfield(HP,'h_bar') || any(~ishandle(HP.h_bar)) || ...
+                 ~isfield(HP,'err_bar')|| any(~ishandle(HP.err_bar));
+    if needCreate
+        % fresh draw once
+        [HP.h_bar, HP.err_bar] = barwitherr(A.std_y, A.val_y, 'Parent', HP.ax);
         
-        % Set Y axis limits
-        if isempty(D.ax{p}.ylm)
-            ylm = [min(D.ax{p}.val_y(:)), max(D.ax{p}.val_y(:))];
-        else
-            ylm = D.ax{p}.ylm;
+        if nclass==1 && isfield(A,'fc') && ~isempty(A.fc)
+            set(HP.h_bar, 'FaceColor', A.fc);
         end
-        ylim(D.ax{p}.h, ylm);
-        
-        % Set X axis limits and ticks
-        if D.nclass > 1 && size(D.ax{p}.val_y,1) == 2
-            xmax = 1;
-        else
-            xmax = size(D.ax{p}.val_y,1);
+        set(HP.h_bar, 'EdgeColor','none');
+        % legend unchanged (kept minimal)
+        if isfield(A,'lg') && ~isempty(A.lg) && nclass>1
+            hl = legend(HP.ax, A.lg); legend(HP.ax,'boxoff'); set(hl,'FontSize',8);
+            HP.legend = hl;
         end
-        
-        xlim(D.ax{p}.h, [0.5, xmax+0.5]);
-        set(D.ax{p}.h, 'XTick', 1:numel(D.ax{p}.label), 'XTickLabel', D.ax{p}.label);
-        title(D.ax{p}.h, D.ax{p}.title);
-        
-        if ~isempty(D.ax{p}.lg) && D.nclass > 1
-            h_legend = legend(D.ax{p}.h, D.ax{p}.lg); 
-            legend(D.ax{p}.h, 'boxoff');
-            set(h_legend, 'FontSize', 8);
+        set(HP.ax,'FontWeight','demi','FontSize',9); box(HP.ax,'on');
+        xmax = size(A.val_y,1); 
+        if nclass>1
+            if size(A.val_y,1)==2 
+                xmax=1; 
+            elseif size(A.val_y,1) == 1
+                xmax=numel(A.val_y);
+            end
         end
-        hold(D.ax{p}.h, 'off');
+        xlim(HP.ax, [0.5, xmax+0.5]); ylim(HP.ax,  A.ylm);
+        set(HP.ax,'XTick',1:numel(A.label),'XTickLabel',A.label,'XTickLabelRotation', 0);
+        title(HP.ax, A.title); ylabel(HP.ax, A.ylb); 
     else
-        % Update existing bar plots
-        set(h, 'CurrentAxes', D.ax{p}.h);
-        for i = 1:D.nclass
-            if any(isnan(D.ax{p}.val_y(:, i)))
-                continue;
+        % update only: bars then errorbars
+        if numel(HP.h_bar)>1
+            n_bar = numel(HP.h_bar);
+            for n=1:n_bar
+                set(HP.h_bar(n), 'YData', A.val_y(:,n));
             end
-            if D.nclass == 1 
-                std_y = D.ax{p}.std_y;
-                val_y = D.ax{p}.val_y;
-            else
-                std_y = D.ax{p}.std_y(:, i);
-                val_y = D.ax{p}.val_y(:, i);
-            end
-            set(D.ax{p}.h_bar(i), 'YData', val_y);
-            set(D.ax{p}.err_bar(i), 'YData', val_y);
-            if ~OCTAVE
-                set(D.ax{p}.err_bar(i), 'YNegativeDelta', std_y);
-                set(D.ax{p}.err_bar(i), 'YPositiveDelta', std_y);
-            end
-            if ~isempty(std_y)
-                set(D.ax{p}.err_bar(i), 'LData', std_y);
-                set(D.ax{p}.err_bar(i), 'UData', std_y);
-            end
-        end
-    end
-end
-
-% === Additional multi-axes plots if required ===
-if multiflag
-    for p = 1:numel(D.m_ax)
-        if ~isfield(D.m_ax{p}, 'h') || ~ishandle(D.m_ax{p}.h)
-            hm = findobj(h, 'Tag', D.m_ax{p}.title);
-            if isempty(hm)
-                D.m_ax{p}.h = axes('Parent', h, 'Position', D.m_ax{p}.position, ...
-                    'Tag', D.m_ax{p}.title, 'FontWeight', 'bold');
-                box(D.m_ax{p}.h, 'on');
-            else
-                D.m_ax{p}.h = hm;
-            end
-            cla(D.m_ax{p}.h);
-            hold(D.m_ax{p}.h, 'on');
-            [D.m_ax{p}.h_bar, D.m_ax{p}.err_bar] = barwitherr(D.m_ax{p}.std_y, D.m_ax{p}.val_y);
-            if D.nclass == 1
-                set(D.m_ax{p}.h_bar, 'FaceColor', D.m_ax{p}.fc);
-            end
-            set(D.ax{p}.h_bar, 'EdgeColor', 'none');
-            set(get(D.m_ax{p}.h,'YLabel'), 'String', D.m_ax{p}.ylb);
-            if isempty(D.m_ax{p}.ylm)
-                ylm = [min(D.m_ax{p}.val_y(:)), max(D.m_ax{p}.val_y(:))];
-            else
-                ylm = D.m_ax{p}.ylm;
-            end
-            ylim(D.m_ax{p}.h, ylm);
-            xlim(D.m_ax{p}.h, [0.5, length(D.m_ax{p}.val_y)+0.5]);
-            set(D.m_ax{p}.h, 'XTick', 1:numel(D.m_ax{p}.label), 'XTickLabel', D.m_ax{p}.label);
-            title(D.m_ax{p}.h, D.m_ax{p}.title);
-            hold(D.m_ax{p}.h, 'off');
         else
-            set(h, 'CurrentAxes', D.m_ax{p}.h);
-            set(D.m_ax{p}.h_bar, 'YData', D.m_ax{p}.val_y);
-            set(D.m_ax{p}.err_bar, 'YData', D.m_ax{p}.val_y);
-            set(D.m_ax{p}.err_bar, 'LData', D.m_ax{p}.std_y);
-            set(D.m_ax{p}.err_bar, 'UData', D.m_ax{p}.std_y);
+            n_bar=1;
         end
+        if isgraphics(HP.err_bar)
+            for n=1:n_bar
+                set(HP.err_bar(n), 'YData', A.val_y(:,n));
+                if any(isprop(HP.err_bar(n),'YNegativeDelta')) && any(isprop(HP.err_bar(n),'YPositiveDelta'))
+                    set(HP.err_bar(n), 'YNegativeDelta', A.std_y(:,n), 'YPositiveDelta', A.std_y(:,n));
+                else
+                    if isprop(HP.err_bar(n),'LData'), set(HP.err_bar(n),'LData', A.std_y(:,n)); end
+                    if isprop(HP.err_bar(n),'UData'), set(HP.err_bar(n),'UData', A.std_y(:,n)); end
+                end
+            end
+        end
+        % Keep axes tidy (labels/titles as you already re-apply after updates)
+        set(HP.ax,'FontWeight','demi','FontSize',9); box(HP.ax,'on');
+        set(HP.ax,'XTick',1:numel(A.label),'XTickLabel',A.label,'XTickLabelRotation', 0);
+        xmax = size(A.val_y,1); 
+        if nclass>1
+            if size(A.val_y,1)==2 
+                xmax=1; 
+            elseif size(A.val_y,1) == 1
+                xmax=numel(A.val_y);
+            end
+        end
+        xlim(HP.ax, [0.5, xmax+0.5]); ylim(HP.ax, A.ylm);
+        title(HP.ax, A.title); ylabel(HP.ax, A.ylb);
     end
+
+    H.(key){p} = HP;
+end
 end
 
-drawnow

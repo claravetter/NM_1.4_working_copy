@@ -200,7 +200,7 @@ if strcmpi(SKW.transformMethod,'yeojohnson') && strcmpi(SKW.YJLambdaType,'manual
 end
 
 % Build the combined param space
-if isfield(PX,'Px') && isfield(PX.Px,'Params') && ~isempty(PX.Px.Params)
+if isfield(PX,'Px') && isfield(PX.Px,'Params') 
     PX.opt = allcomb(PX.Px.Params, 'matlab');
 else
     PX.opt = [];

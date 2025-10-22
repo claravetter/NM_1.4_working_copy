@@ -12,6 +12,7 @@ TakeAbs             = 1;
 ReplZeroNaNwithRealMin = 1;
 WeightScale         = 1;
 act = 0;
+BINMOD              = NM.TrainParam.PREPROC{varind}.BINMOD;
 
 if ~defaultsfl
 
@@ -168,9 +169,9 @@ if ~defaultsfl
                         if isfield(RANK,'simba') 
                             simba = RANK.simba; 
                         else
-                            simba = nk_Simba_config([], 1,[],ngroups);
+                            simba = nk_Simba_config([], 1,[],ngroups, BINMOD);
                         end
-                        simba = nk_Simba_config(simba, 0,[],ngroups); RANK.simba = simba;
+                        simba = nk_Simba_config(simba, 0,[],ngroups, BINMOD); RANK.simba = simba;
                         if isfield(simba.simba,'extra_param') && ...
                                 isnumeric(simba.simba.extra_param.beta),             PX = nk_AddParam(simba.simba.extra_param.beta, 'Beta',1, PX, 'replace');
                         end

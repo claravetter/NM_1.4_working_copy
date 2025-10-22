@@ -45,7 +45,6 @@ if isempty(k)
 else
     if k==-1, k=size(Y,2); end
 end
-if VERBOSE; fprintf(' Selecting %g features using %s algorithm (FEAST toolbox) ... ',k, params.MethodStr); end
 tic;
 switch params.Method
 
@@ -70,15 +69,16 @@ switch params.Method
             ind(:,i) = feast( params.MethodStr, k, Y, label, P(i,1), P(i,2) );
         end
     case 12
-        
 end
-
+nInd = numel(ind);
+if k~= nInd, k=nInd; end
+if VERBOSE; fprintf(' Selecting %g features using %s algorithm (FEAST toolbox) ... ', numel(ind), params.MethodStr); end
 if nargout == 2
     % Create weight vector
     W = (k:-1:1)'./k;
     R = zeros(n,size(ind,2));
-    for i=1:size(ind,2)
-        R(ind(:,i)) = W;
+    for i=1:numel(ind)
+        R(ind(i)) = W(i);
     end
 else
     R=[];

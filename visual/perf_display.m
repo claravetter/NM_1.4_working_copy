@@ -2,6 +2,10 @@ function handles = perf_display(handles)
 
 % Set current analysis
 analind = get(handles.selAnalysis,'Value');
+
+% Set one-vs-rest flag for multi-class analyses, if any
+handles.one_vs_rest = false;
+
 if analind > numel(handles.NM.analysis), analind = 1; handles.selAnalysis.Value = 1; end
 if isempty(analind), analind = 1; end
 if ~isfield(handles,'modeflag')
@@ -57,6 +61,10 @@ if isfield(handles,'multilabel') && handles.multilabel
 end
 
 [handles, visdata] = switch_analysis(handles);
+
+if strcmp(handles.modeflag,'regression')
+    handles.txtBinarize.String = '';
+end
 
 if isfield(handles,'MLIapp') && ~isfield(handles.NM.analysis{analind},'MLI') && ~isempty(handles.MLIapp) && handles.MLIapp~=0
     handles.MLIapp.delete;
