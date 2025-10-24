@@ -3,7 +3,7 @@ function param = nk_EnsembleStrategy_config(param, SVM, MODEFL, defaultsfl, pare
 % ----------------------- defaults -----------------------------------------
 Ensemble.type            = 0;
 Ensemble.Metric          = 2;
-Ensemble.Mode            = 3;              % hard-wired for Probabilistic Feature Extraction
+Ensemble.Mode            = 4;              % hard-wired for Probabilistic Feature Extraction
 Ensemble.MinNum          = 1;
 Ensemble.Perc            = 75;
 Ensemble.DataType        = 2;
@@ -61,7 +61,7 @@ if ~defaultsfl
     if SubSpaceStrategy > 1
         menustr = sprintf('%s|Define ensemble optimization method [ %s ]', menustr, d.EnsConMode); menuact = [menuact 2];
 
-        if Ensemble.ConstructMode && Ensemble.ConstructMode ~= 4
+        if Ensemble.ConstructMode && Ensemble.ConstructMode <4  
             % ----------------- OVERHAULED MENU (act=3) -------------------
             if strcmpi(MODEFL,'classification')
                 menustr = sprintf('%s|Select the optimization function [ %s ]', menustr, local_divcrit_label(Ensemble));
@@ -224,7 +224,8 @@ if ~defaultsfl
                 'No weighting|Weight = 1 / resubstitution error',[0,1], Ensemble.Weighting);
 
         case 7
-            Ensemble.Perc = nk_input('[%] of cross-subspace feature agreement',0,'e',Ensemble.Perc);
+            Ensemble.Perc = nk_input('Cross-subspace feature agreement cutoff [%]',0,'e',Ensemble.Perc);
+            Ensemble.Mode = 4; % Hard-wired       
 
         case 8
             Ensemble.MinNum = nk_input('Minimum number of features to retain',0,'e',Ensemble.MinNum);

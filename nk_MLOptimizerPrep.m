@@ -642,20 +642,3 @@ if ~inp.batchflag || (~isfield(inp,'simFlag') || ~inp.simFlag)
     fprintf('\nSaving %s', strGDdimsfile);
     save(strGDdimsfile,'analysis');
 end
-
-function [DR, BINMOD, FEATSEL, CLUST, COVAR] = get_preproc_params(PREPROC)
-
-DR=[]; FEATSEL=[]; CLUST=[]; COVAR=[]; BINMOD=[];
-if isfield(PREPROC,'FEATSEL'), FEATSEL = PREPROC.FEATSEL; end
-if isfield(PREPROC,'BINMOD'), BINMOD = PREPROC.BINMOD; end
-if isfield(PREPROC,'ACTPARAM')
-    for i=1:numel(PREPROC.ACTPARAM)
-        if isfield(PREPROC.ACTPARAM{i},'DR')
-            DR = PREPROC.ACTPARAM{i}.DR;
-        elseif isfield(PREPROC.ACTPARAM{i},'CLUST')
-            CLUST = PREPROC.ACTPARAM{i}.CLUST;
-        elseif isfield(PREPROC.ACTPARAM{i},'COVAR')
-            COVAR = PREPROC.ACTPARAM{i}.COVAR;
-        end
-    end
-end

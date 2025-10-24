@@ -1199,6 +1199,8 @@ switch action
                 vargout.prog = 'Multilayer Perceptron';
             case 'TFDEEP'
                 vargout.prog = 'Tensorflow neural network';
+            case 'BAYLIN'
+                vargout.prog = 'Linear Bayesian algorithm';
             otherwise
                 vargout.prog = params.SVM.prog;
         end
@@ -1336,6 +1338,8 @@ switch action
                 vargout.classifier = 'Python''s sklearn.neural_network.MLPClassifier algorithm';
             case 'TFDEEP'
                 vargout.classifier = 'Python''s tensorflow.keras.Sequential algorithm';
+            case 'BAYLIN'
+                vargout.classifier = 'Python''s sklearn.sklearn.linear_model.BayesianRidge/ARDRegression algorithm';
         end
         
     case 'kernel'            

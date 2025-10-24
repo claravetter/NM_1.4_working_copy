@@ -49,6 +49,10 @@ switch EnsStrat.Mode
         [~,ind] = sort(AgreePerc,'descend');
         thresh = ceil(numel(AgreePerc)*(EnsStrat.Perc(q)/100));
         tF = false(nF,1); tF(ind(1:thresh)) = true;
+    case 4
+        % >Percentage of cross-subspace agreement
+        ind = AgreePerc>EnsStrat.Perc(q);
+        tF = false(nF,1); tF(ind) = true;
 end
 
 if isfield(EnsStrat,'PruneFlag')

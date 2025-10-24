@@ -87,7 +87,8 @@ if ~isfield(DISP, 'visited'), DISP.visited = []; end
 
 % Build numeric grid from Ps{1} for surrogate modeling.
 if combcell
-    Xgrid = cell2mat(Ps{1});
+    idxCharCols = all(cellfun(@ischar, Ps{1}), 1);
+    Xgrid = cell2mat(Ps{1}(:,~idxCharCols));
 else
     Xgrid = Ps{1};
 end

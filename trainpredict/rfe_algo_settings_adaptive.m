@@ -1,4 +1,4 @@
-function AdIn = rfe_algo_settings_adaptive(RFE)
+function [AdIn, Hist] = rfe_algo_settings_adaptive(RFE)
 
 % =========================================================================
 %                         ADAPTIVE WRAPPER SETTINGS
@@ -7,7 +7,7 @@ function AdIn = rfe_algo_settings_adaptive(RFE)
 % still pass the struct through (Enable=true/false decides behavior).
 % =========================================================================
 
-AdIn = struct();
+AdIn = struct(); Hist = struct();
 
 % Pull user config if present; otherwise start from a small default shell.
 if isfield(RFE,'Wrapper') && isfield(RFE.Wrapper,'GreedySearch') && isfield(RFE.Wrapper.GreedySearch,'AdRef')
@@ -128,7 +128,6 @@ if AdIn.Enable
     Hist.rvec_snap   = {};                 % cell of rvec (or per-class cell) snapshots
     Hist.rvec_snap_it= 1;                 % iteration when snapshot taken
     Hist.snap_every  = 1;                  % take snapshot every 5 accepts (tune or set 0 to disable)
-    r.Hist = Hist;
 end
 
 end 

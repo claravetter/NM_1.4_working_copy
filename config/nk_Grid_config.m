@@ -121,14 +121,11 @@ if ~defaultsfl
     if isfield(GRD,'RFMinImpDecrparams'),       MinImpDecrdefs = GRD.RFMinImpDecrparams; end
     if isfield(GRD,'RFBootstrapparams'),        Bootstrapdefs = GRD.RFBootstrapparams; end
     if isfield(GRD,'RFOobScoreparams'),         OobScoredefs = GRD.RFOobScoreparams; end
-
     if strcmp(NM.modeflag,'classification') 
         if isfield(GRD,'RFClassWeightparams'),  ClassWeightdefs = GRD.RFClassWeightparams; end
     end
     if isfield(GRD,'RFCcpAlphaparams'),         CcpAlphadefs = GRD.RFCcpAlphaparams; end
     if isfield(GRD,'MaxSampparams'),            MaxSampdefs = GRD.MaxSampparams; end
-
-
     if isfield(GRD,'Weightparams'),             Weightdefs = GRD.Weightparams; end
     if isfield(GRD,'CutOffparams'),             SEQOPTstepsdefs = GRD.CutOffparams; end
     if isfield(GRD,'LimsLparams'),              SEQOPTlimsLdefs = GRD.LimsLparams; end
@@ -237,7 +234,6 @@ if ~defaultsfl
                 if EXPERT
                     %Last parameter.
                     mlperc_nP = numel(GRD.(SVM.prog).Params);
-
                 else
                     %all but last.
                     mlperc_nP = numel(GRD.(SVM.prog).Params) - 1;
@@ -253,11 +249,22 @@ if ~defaultsfl
                 str = 'undefined'; 
             end
             menustr = sprintf('%s|Define %s parameters [ %s ]|', menustr, SVM.prog, str); 
-            menuact = [ menuact 21 ];
-
-
-        
+            menuact = [ menuact 21 ];    
             
+        case 'BAYLIN'
+            if isfield(GRD,SVM.prog) && isfield(GRD.(SVM.prog),'Params') && ~isempty(GRD.(SVM.prog).Params)
+                mlperc_nP = numel(GRD.(SVM.prog).Params);
+                for i=1:numel(GRD.(SVM.prog).Params)
+                    parstr = GRD.(SVM.prog).Params(i).name;
+                    [~, n_pars(end+1)] = nk_ConcatParamstr(GRD.(SVM.prog).Params(i).range);
+                    PX = nk_AddParam(GRD.(SVM.prog).Params(i).range, ['ML-' parstr], 2, PX);
+                end
+                str = sprintf('%g parameters defined', mlperc_nP);
+            else
+                str = 'undefined'; 
+            end
+            menustr = sprintf('%s|Define %s parameters [ %s ]|', menustr, SVM.prog, str); 
+            menuact = [ menuact 21 ];    
     end
     
     %% Kernel setup
@@ -645,9 +652,6 @@ if ~defaultsfl
                                        ['Gini impurity (default)|' ...
                                         'Log loss|' ...
                                         'Entropy'], [1,2,3], Critdefs);
-            
-
-            %PX = nk_AddParam(Critdefs, ['ML-' Critparstr], 2, PX);
         case 32
             MaxDdefs    = nk_input([MaxDparstr ' range'], 0,'e', MaxDdefs);
             PX = nk_AddParam(MaxDdefs, ['ML-' MaxDparstr], 2, PX);
@@ -714,8 +718,8 @@ if ~defaultsfl
                     GRD.(SVM.prog) = nk_MLPERC_config(SVM.prog, PXX, 0, NM.modeflag);
                 case 'TFDEEP'
                     GRD.(SVM.prog) = nk_TFDEEP_config(SVM.prog, PXX, 0, NM.modeflag);
-
-      
+                case 'BAYLIN'
+                    GRD.(SVM.prog) = nk_BAYLIN_config(SVM.prog, PXX, 0, NM.modeflag);
             end
         case 22
             SEQOPTstepsdefs =  nk_input([CutOffparstr ' range'],0,'e',SEQOPTstepsdefs);         PX = nk_AddParam(SEQOPTstepsdefs, ['ML-' CutOffparstr], 2, PX);

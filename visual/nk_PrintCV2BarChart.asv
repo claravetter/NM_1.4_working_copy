@@ -122,22 +122,21 @@ for p = 1:numel(AxSpec)
     else
         % update only: bars then errorbars
         if numel(HP.h_bar)>1
-            n_bar = numel(n_bar);
+            n_bar = numel(HP.h_bar);
             for n=1:n_bar
                 set(HP.h_bar(n), 'YData', A.val_y(:,n));
             end
         else
             n_bar=1;
+            set(HP.h_bar, 'YData', A.val_y(:,1));
         end
-        if isgraphics(HP.err_bar)
-            for i=1:n_bar
-                set(HP.err_bar(n_bar), 'YData', A.val_y(:,n));
-                if any(isprop(HP.err_bar,'YNegativeDelta')) && any(isprop(HP.err_bar,'YPositiveDelta'))
-                    set(HP.err_bar, 'YNegativeDelta', A.std_y, 'YPositiveDelta', A.std_y);
-                else
-                    if isprop(HP.err_bar,'LData'), set(HP.err_bar,'LData', A.std_y); end
-                    if isprop(HP.err_bar,'UData'), set(HP.err_bar,'UData', A.std_y); end
-                end
+        for n=1:n_bar
+            set(HP.err_bar(n), 'YData', A.val_y(:,n));
+            if any(isprop(HP.err_bar(n),'YNegativeDelta')) && any(isprop(HP.err_bar(n),'YPositiveDelta'))
+                set(HP.err_bar(n), 'YNegativeDelta', A.std_y(:,n), 'YPositiveDelta', A.std_y(:,n));
+            else
+                if isprop(HP.err_bar(n),'LData'), set(HP.err_bar(n),'LData', A.std_y(:,n)); end
+                if isprop(HP.err_bar(n),'UData'), set(HP.err_bar(n),'UData', A.std_y(:,n)); end
             end
         end
         % Keep axes tidy (labels/titles as you already re-apply after updates)

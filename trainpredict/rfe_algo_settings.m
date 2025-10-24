@@ -122,6 +122,6 @@ if isfield(RFE.Wrapper.GreedySearch,'CaseFrwd')
     r.CaseSpL  = r.CaseL(1):round((r.CaseL(2)-r.CaseL(1))/r.CaseStep):r.CaseL(2);
 end
 
-r.AdRef = rfe_algo_settings_adaptive(RFE);
+[r.AdRef, r.Hist] = rfe_algo_settings_adaptive(RFE);
 
 end

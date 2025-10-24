@@ -28,8 +28,6 @@ if isMatlabOnline
     set(h, 'Units', 'pixels', 'Position', fig_pos);
 end
 % For desktop MATLAB, the default D.figuresz or existing position is used.
-
-
 % --- handle cache in appdata ---
 H = getappdata(h,'CV2Handles');
 if isempty(H), H = struct(); end
@@ -145,16 +143,15 @@ for p = 1:numel(AxSpec)
             end
         else
             n_bar=1;
+            set(HP.h_bar, 'YData', A.val_y);
         end
-        if isgraphics(HP.err_bar)
-            for n=1:n_bar
-                set(HP.err_bar(n), 'YData', A.val_y(:,n));
-                if any(isprop(HP.err_bar(n),'YNegativeDelta')) && any(isprop(HP.err_bar(n),'YPositiveDelta'))
-                    set(HP.err_bar(n), 'YNegativeDelta', A.std_y(:,n), 'YPositiveDelta', A.std_y(:,n));
-                else
-                    if isprop(HP.err_bar(n),'LData'), set(HP.err_bar(n),'LData', A.std_y(:,n)); end
-                    if isprop(HP.err_bar(n),'UData'), set(HP.err_bar(n),'UData', A.std_y(:,n)); end
-                end
+        for n=1:n_bar
+            set(HP.err_bar(n), 'YData', A.val_y(:,n));
+            if any(isprop(HP.err_bar(n),'YNegativeDelta')) && any(isprop(HP.err_bar(n),'YPositiveDelta'))
+                set(HP.err_bar(n), 'YNegativeDelta', A.std_y(:,n), 'YPositiveDelta', A.std_y(:,n));
+            else
+                if isprop(HP.err_bar(n),'LData'), set(HP.err_bar(n),'LData', A.std_y(:,n)); end
+                if isprop(HP.err_bar(n),'UData'), set(HP.err_bar(n),'UData', A.std_y(:,n)); end
             end
         end
         % Keep axes tidy (labels/titles as you already re-apply after updates)

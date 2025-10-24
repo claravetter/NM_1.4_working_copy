@@ -176,7 +176,7 @@ for i=1:inparams.nclass
     
     %% other algorithms have to be treated as special cases (will be revised in the future to have one parameter interface for all algorithms)
     switch SVM.prog
-        case {'matLRN','GLMNET','GRDBST','ROBSVM','ELASVM'}
+        case {'matLRN','GLMNET','GRDBST','ROBSVM','ELASVM','BAYLIN'}
             if strcmp(SVM.prog,'matLRN'), F='matLearn'; else, F=SVM.prog; end
             if ~isfield(GRD.(F),'Params') || isempty(GRD.(F).Params)
                  if VERBOSE, fprintf('\n%s #%g: No parameters have to be optimized.',strout,i); end

@@ -44,6 +44,12 @@ for covarIdx = 1:numCovars
     % Find unique groups in the sensitive attribute.
     uniqueGroups = unique(covar);
 
+    % Check if the number of unique groups exceeds 10
+    if numel(uniqueGroups) > 10
+        warning('RemoveDisparateImpact:PossibleContinuousCovariate', ...
+            'DIR works with discrete covariates only. Covariate number %d appears to have more than 10 unique groups. Remove continuous covariates.', covarIdx);
+    end
+
     % Initialise repaired data matrix if first covar.
     if covarIdx == 1; repairedData = data; end
     

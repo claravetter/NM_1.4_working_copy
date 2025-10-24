@@ -64,10 +64,29 @@ function [opt_hE, opt_E, opt_F, opt_D] = nk_CVMax(E, L, EnsStrat)
 global MODEFL VERBOSE SVM
 
 % --- filter rows with labels ------------------------------------------------
-ind0 = (L ~= 0); E = E(ind0,:); L = L(ind0);
+% --- filter rows with labels (only for internal metrics/diversity) --------
+E_full = E; 
+L_full = L;
+
+varflag = ~strcmpi(MODEFL,'classification');  % 0 => classification
+
+if varflag
+    % REGRESSION: keep zeros; only drop NaNs
+    ind0 = ~isnan(L_full);
+else
+    % CLASSIFICATION: 0 means "ignore row" (NM convention) + drop NaNs
+    ind0 = (L_full ~= 0) & ~isnan(L_full);
+end
+
+E = E_full(ind0,:);
+L = L_full(ind0,:);
 [N,k] = size(E);
 if N==0 || k==0
-    opt_hE = 0; opt_E = E; opt_F = []; opt_D = 0; return;
+    opt_hE = 0; 
+    opt_E  = E_full;                 
+    opt_F  = 1:size(E_full,2); 
+    opt_D  = 0; 
+    return;
 end
 
 % --- defaults ---------------------------------------------------------------
