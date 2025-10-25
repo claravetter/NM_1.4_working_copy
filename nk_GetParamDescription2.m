@@ -819,6 +819,8 @@ switch action
                             num2str(params.Filter.EnsembleStrategy.Perc) ...
                             ', min # of features: ' ...
                             num2str(params.Filter.EnsembleStrategy.MinNum) ')'];
+                    case 10
+                        vargout.FeatFltEnsStrat = 'Boosting strategy';
 
                     otherwise 
 
@@ -921,7 +923,7 @@ switch action
             case 4
                 vargout.EnsConMode = 'Ensemble-based Probabilistic Feature Extraction';
             case 5
-                vargout.EnsConMode = 'Adaboost (NOT TESTED)';
+                vargout.EnsConMode = 'Boosting';
         end
         switch params.EnsembleStrategy.DivCrit
             case 0

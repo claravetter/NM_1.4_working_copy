@@ -9,7 +9,7 @@ Ensemble.Perc            = 75;
 Ensemble.DataType        = 2;
 Ensemble.Weighting       = 0;
 Ensemble.DivCrit         = 2;               % 1 entropy-only, 2 perf+diversity, 3 kappa-only, 4 lobag-only, 5 reg-only
-Ensemble.ConstructMode   = 0;               % 0 agg, 1 BE, 2 FS, 4 prob-subspace, 5 AdaBoost (TBD)
+Ensemble.ConstructMode   = 0;               % 0 agg, 1 BE, 2 FS, 4 prob-subspace, 5 Boosting 
 Ensemble.DivStr          = '';
 Ensemble.DivFunc         = '';
 Ensemble.OptFunc         = '';
@@ -26,6 +26,26 @@ SubSpaceStrategy = 1;
 SubSpaceCrit     = 0;
 act              = 0;
 CostFun          = 2;
+
+% ------- Boosting defaults (used when ConstructMode==5 / type==10) -------
+Ensemble.Boosting = struct( ...
+    'mode','ridge', ...         % 'ridge'|'logloss'|'expgrad'
+    'lambda',1e-3, ...
+    'alpha',0.0, ...
+    'useLogits',false, ...
+    'wThreshold',0.0, ...
+    'clip',1e-7, ...
+    'eta',0.3, ...
+    'T',200, ...
+    'shareWeights',false, ...
+    'Kernel', struct( ...       % <-- new sub-struct (regression only)
+        'regMode','residual-cov', ...   % 'residual-cov'|'residual-corr'|'residual-lapl'
+        'diagMode','one', ...           % 'one'|'zero'|'keep'
+        'scaleTo','HHT', ...            % 'HHT'|'unit'
+        'autoAlpha',false, ...          % if true, alpha computed from tau
+        'tau',0.10 ...                  % target fraction (0 disables; clamp to [0,0.5])
+    ) ...
+);
 
 if nargin < 4 || isempty(defaultsfl), defaultsfl = 0; end
 
@@ -61,52 +81,103 @@ if ~defaultsfl
     if SubSpaceStrategy > 1
         menustr = sprintf('%s|Define ensemble optimization method [ %s ]', menustr, d.EnsConMode); menuact = [menuact 2];
 
-        if Ensemble.ConstructMode && Ensemble.ConstructMode <4  
+        if Ensemble.ConstructMode && Ensemble.ConstructMode < 4  
             % ----------------- OVERHAULED MENU (act=3) -------------------
             if strcmpi(MODEFL,'classification')
-                menustr = sprintf('%s|Select the optimization function [ %s ]', menustr, local_divcrit_label(Ensemble));
+                menustr = sprintf('%s|Select the optimization function for classification [ %s ]', menustr, local_divcrit_label(Ensemble));
             else
-                menustr = sprintf('%s|Select the optimization function [ %s ]', menustr, local_divcrit_label_reg(Ensemble));
+                menustr = sprintf('%s|Select the optimization function for regression [ %s ]', menustr, local_divcrit_label_reg(Ensemble));
             end
             menuact = [menuact 3];
 
             % If combining perf+diversity, expose individual regularizers:
             if Ensemble.DivCrit == 2
-                menustr = sprintf('%s|Choose diversity metric to combine with performance [ %s ]', ...
+                menustr = sprintf('%s|Forward/Backward Search: Choose diversity metric to combine with performance [ %s ]', ...
                                   menustr, local_pretty_divsrc(Ensemble.DiversitySource));        menuact = [menuact 9];
-                menustr = sprintf('%s|Set performance slack (%% of criterion range) [ %g %% ]', ...
+                menustr = sprintf('%s|Forward/Backward Search: Set performance slack (%% of criterion range) [ %g %% ]', ...
                                   menustr, 100*Ensemble.PerfSlackPct);                            menuact = [menuact 10];
-                menustr = sprintf('%s|Set diversity weight (rank blend w_E) [ %g ]', ...
+                menustr = sprintf('%s|Forward/Backward Search: Set diversity weight (rank blend w_E) [ %g ]', ...
                                   menustr, Ensemble.EntropyWeight);                               menuact = [menuact 11];
-                menustr = sprintf('%s|Set size penalty λ (0=off) [ %g ]', ...
+                menustr = sprintf('%s|Forward/Backward Search: Set size penalty λ (0=off) [ %g ]', ...
                                   menustr, Ensemble.SizePenalty);                                 menuact = [menuact 12];
-                menustr = sprintf('%s|Set early-stop patience (steps, 0=off) [ %g ]', ...
+                menustr = sprintf('%s|Forward/Backward Search: Set early-stop patience (steps, 0=off) [ %g ]', ...
                                   menustr, Ensemble.Patience);                                    menuact = [menuact 13];
-                menustr = sprintf('%s|Show quick help on regularizers', menustr);                 menuact = [menuact 14];
+                menustr = sprintf('%s|Forward/Backward Search: Show quick help on regularizers', menustr);                 menuact = [menuact 14];
             else
-                menustr = sprintf('%s|Set diversity epsilon ε (tolerance) [ %g ]', ...
+                menustr = sprintf('%s|Forward/Backward Search: Set diversity epsilon ε (tolerance) [ %g ]', ...
                                   menustr, Ensemble.DiversityEps);                                menuact = [menuact 15];
-                menustr = sprintf('%s|Set size penalty γ (0=off) [ %g ]', ...
+                menustr = sprintf('%s|Forward/Backward Search: Set size penalty γ (0=off) [ %g ]', ...
                                   menustr, Ensemble.SizePenalty);                                 menuact = [menuact 12];
-                menustr = sprintf('%s|Show quick help on diversity-only knobs', menustr);         menuact = [menuact 16];
+                menustr = sprintf('%s|Forward/Backward Search: Show quick help on diversity-only knobs', menustr);         menuact = [menuact 16];
             end
         end
 
-        if Ensemble.type ~= 0 && Ensemble.type ~= 9
+        if Ensemble.type ~= 0 && Ensemble.type <9
             if strcmpi(MODEFL,'classification')
                 menustr = sprintf('%s|Use algorithm output scores or label predictions [ %s ]', menustr, d.FeatMetric); menuact = [menuact 4];
             else
                 Ensemble.Metric = 1; Ensemble.DiversitySource = 'regvar';
             end
             menustr = sprintf('%s|Define minimum # of classifiers to be selected [ %1.0f ]', menustr, Ensemble.MinNum);  menuact = [menuact 5];
-            menustr = sprintf('%s|Enable weighting of feature subspaces [ %s ]', menustr, d.EnsWeighting);              menuact = [menuact 6];
+            menustr = sprintf('%s|Enable weighting of feature subspaces [ %s ]', menustr, d.EnsWeighting);               menuact = [menuact 6];
         elseif Ensemble.type == 9
             menustr = sprintf('%s|Define percentage of cross-subspace feature agreement [ %g ]', menustr, Ensemble.Perc);     menuact = [menuact 7];
             menustr = sprintf('%s|Define minimum number of features to select across feature subspaces [ %1.0f ]', menustr, Ensemble.MinNum); menuact = [menuact 8];
             Ensemble.Weighting = 0;
         end
-    end
 
+        % --- If Boosting is selected, append a Boosting parameter submenu ---
+        if Ensemble.ConstructMode == 5
+            % A compact one-line preview for the current Boosting config:
+            b = Ensemble.Boosting;
+            modePreview = upper(b.mode);
+            if strcmpi(MODEFL,'classification')
+                menustr = sprintf('%s|Boosting: Select mode [ %s ]', menustr, modePreview);                 menuact = [menuact 20];
+            end
+            % expgrad-only params (show but guard if mode != expgrad)
+            if strcmpi(modePreview,'expgrad')
+                menustr = sprintf('%s|Boosting: Set expgrad η (step) [ %g ]', menustr, b.eta);              menuact = [menuact 26];
+                menustr = sprintf('%s|Boosting: Set expgrad T (iters) [ %d ]', menustr, b.T);               menuact = [menuact 27];
+            
+                % advanced (shared weights across dichotomizers)
+                menustr = sprintf('%s|Boosting: Toggle shareWeights across classes [ %s ]', ...
+                                  menustr, onoff(b.shareWeights));                                          menuact = [menuact 28];
+            elseif strcmpi(modePreview,'logloss')
+                menustr = sprintf('%s|Boosting: Set prob clip (logloss) [ %g ]', menustr, b.clip);          menuact = [menuact 25];
+            end
+            menustr = sprintf('%s|Boosting: Set λ (L2) [ %g ]', menustr, b.lambda);                     menuact = [menuact 21];
+            menustr = sprintf('%s|Boosting: Set α (diversity weight) [ %g ]', menustr, b.alpha);        menuact = [menuact 22];
+            % show diversity-source picker ONLY if alpha>0
+            if b.alpha > 0
+                if strcmpi(MODEFL,'classification')
+                    menustr = sprintf('%s|Boosting: Choose diversity metric (R-kernel) [ %s ]', ...
+                                  menustr, local_pretty_divsrc(Ensemble.DiversitySource));              menuact = [menuact 9];
+                elseif strcmpi(MODEFL,'regression') 
+                    k = Ensemble.Boosting.Kernel;
+                    menustr = sprintf('%s|Boosting in Regression: Diversity kernel mode [ %s ]', ...
+                                      menustr, upper(k.regMode));                                           menuact = [menuact 29];
+                    menustr = sprintf('%s|Boosting in Regression: Kernel diagonal [ %s ]', ...
+                                      menustr, k.diagMode);                                                 menuact = [menuact 30];
+                    menustr = sprintf('%s|Boosting in Regression: Kernel scaling [ %s ]', ...
+                                      menustr, k.scaleTo);                                                  menuact = [menuact 31];
+                    % Auto-alpha: show ON/OFF and τ value; user can set τ in handler
+                    if k.autoAlpha
+                        autostr = sprintf('ON ( = %.3g)', k.tau);
+                    else
+                        autostr = 'OFF';
+                    end
+                    menustr = sprintf('%s|Boosting in Regression: Auto-alpha (set τ; 0 disables) [ %s ]', ...
+                                      menustr, autostr);                                                    menuact = [menuact 32];
+                end
+            end
+            if strcmpi(MODEFL,'classification')
+                menustr = sprintf('%s|Boosting: Toggle useLogits (scores→logits) [ %s ]', ...
+                                  menustr, onoff(b.useLogits));                                         menuact = [menuact 23];
+            end
+        
+            menustr = sprintf('%s|Boosting: Set threshold for low weights in w (sparsify) [ %g ]', menustr, b.wThreshold); menuact = [menuact 24];
+        end
+    end
     nk_PrintLogo
     mestr = 'Subspace-based ensemble optimization setup'; fprintf('\nYou are here: %s >>>',parentstr);
     act = nk_input(mestr, 0,'mq', menustr, menuact);
@@ -135,9 +206,19 @@ if ~defaultsfl
                  'Optimize ensemble using backward base learner elimination|' ...
                  'Optimize ensemble using forward base learner selection|' ...
                  'Create a single classifier using probabilistic feature subspace construction|' ...
-                 'Use AdaBoost to determine optimal weighting of bases learners'],[0 1 2 4 5], Ensemble.ConstructMode);
+                 'Use boosting framework to determine optimal weighting of bases learners'],[0 1 2 4 5], Ensemble.ConstructMode);
             if (Ensemble.ConstructMode && Ensemble.ConstructMode ~= 4) && ~Ensemble.DivCrit, Ensemble.DivCrit = 2; end
-
+            if Ensemble.ConstructMode == 5
+                if strcmpi(MODEFL,'classification')
+                    if ~isfield(Ensemble,'Boosting') || isempty(Ensemble.Boosting)
+                        Ensemble.Boosting = struct('mode','logloss','lambda',1e-3,'alpha',0,'useLogits',false,'wThreshold',0,'clip',1e-7,'eta',0.3,'T',200,'shareWeights',false);
+                    end
+                else
+                    Ensemble.Boosting.mode = 'ridge';
+                    Ensemble.Boosting.useLogits = false;
+                end
+                Ensemble = local_sanitize_boosting(MODEFL, Ensemble);
+            end
         case 3
             % --------- OVERHAULED "Select the optimization function" -------
             if strcmpi(MODEFL,'classification')
@@ -146,7 +227,7 @@ if ~defaultsfl
                   'Entropy (vote-entropy) [label-free vote dispersion]|' ...
                   '1 − Double-fault (A) [reduces simultaneous errors]|' ...
                   '−Q statistic [error-correlation; more negative ==> more diversity]|' ...
-                  '(1 − Fleiss'' kappa)/2 [agreement over correctness; lower agreement ==> higher diversity]|' ...
+                  '(1 − Fleiss'' κ)/2 [agreement over correctness; lower agreement ==> higher diversity]|' ...
                   '−LoBag ED [bias–variance Error Diversity; lower ED ==> better]|' ...
                   'COMBINE performance WITH a diversity metric' ];
             
@@ -240,17 +321,17 @@ if ~defaultsfl
             end
 
         case 10
-            slackPct = nk_input('Performance slack as PERCENT of criterion range (e.g., 0.5)',0,'e',100*Ensemble.PerfSlackPct);
+            slackPct = nk_input('Forward/Backward Search:Performance slack as PERCENT of criterion range (e.g., 0.5)',0,'e',100*Ensemble.PerfSlackPct);
             Ensemble.PerfSlackPct = max(0, slackPct)/100;
 
         case 11
-            Ensemble.EntropyWeight = nk_input('Weighted-rank diversity weight (w_E)',0,'e',Ensemble.EntropyWeight);
+            Ensemble.EntropyWeight = nk_input('Forward/Backward Search:Weighted-rank diversity weight (w_E)',0,'e',Ensemble.EntropyWeight);
 
         case 12
-            Ensemble.SizePenalty = nk_input('Size penalty λ (0=off)',0,'e',Ensemble.SizePenalty);
+            Ensemble.SizePenalty = nk_input('Forward/Backward Search: Size penalty λ (0=off)',0,'e',Ensemble.SizePenalty);
 
         case 13
-            Ensemble.Patience = nk_input('Early-stop patience (steps, 0=off)',0,'e',Ensemble.Patience);
+            Ensemble.Patience = nk_input('Forward/Backward Search:Early-stop patience (steps, 0=off)',0,'e',Ensemble.Patience);
 
         case 14
             txt = local_regularizer_help(SVM, Ensemble);
@@ -260,7 +341,7 @@ if ~defaultsfl
                 fprintf('\n%s\n', txt);
             end
         case 15  % ε for DiversityMax
-            Ensemble.DiversityEps = nk_input('Set diversity epsilon ε (tolerance)',0,'e',Ensemble.DiversityEps);
+            Ensemble.DiversityEps = nk_input('Set diversity ε (tolerance)',0,'e',Ensemble.DiversityEps);
         case 16  % quick help
             txt = sprintf([ ...
                 'Diversity-only knobs (nk_DiversityMax)\n' ...
@@ -275,6 +356,87 @@ if ~defaultsfl
                 '  • Typical: 0–0.1 relative to your diversity scale.\n' ...
                 ]);
             try, helpdlg(txt,'Diversity-only guidance'); catch, fprintf('\n%s\n',txt); end
+
+            case 20  % Boosting mode
+                if strcmpi(MODEFL,'classification')
+                    opts = 'ridge (MSE stacking)|logloss (cross-entropy)|expgrad (AdaBoost-like)';
+                    map  = {'ridge','logloss','expgrad'};
+                    def  = find(strcmpi(map, Ensemble.Boosting.mode)); if isempty(def), def = 1; end
+                    idx  = nk_input('Boosting: Select mode',0,'m',opts,1:3,def);
+                    Ensemble.Boosting.mode = map{idx};
+                else
+                    % regression: only ridge makes sense
+                    Ensemble.Boosting.mode = 'ridge';
+                end
+                Ensemble = local_sanitize_boosting(MODEFL, Ensemble);
+            
+            case 21  % lambda
+                Ensemble.Boosting.lambda = max(eps, nk_input('Boosting: Set λ (L2)',0,'e',Ensemble.Boosting.lambda));
+            
+            case 22  % alpha (diversity)
+                Ensemble.Boosting.alpha = max(0, nk_input('Boosting: Set α (diversity weight)',0,'e',Ensemble.Boosting.alpha));
+            
+            case 23  % useLogits (classification only)
+                if strcmpi(MODEFL,'classification')
+                    Ensemble.Boosting.useLogits = ~Ensemble.Boosting.useLogits;
+                end
+            
+            case 24  % wThreshold
+                Ensemble.Boosting.wThreshold = max(0, nk_input('Boosting: Set threshold for w (sparsify small weights)',0,'e',Ensemble.Boosting.wThreshold));
+            
+            case 25  % clip
+                Ensemble.Boosting.clip = max(0, min(0.5, nk_input('Boosting: Set probability clip (0..0.5)',0,'e',Ensemble.Boosting.clip)));
+            
+            case 26  % eta (expgrad)
+                Ensemble.Boosting.eta = max(1e-4, nk_input('Boosting: Set expgrad η (step size)',0,'e',Ensemble.Boosting.eta));
+                Ensemble = local_sanitize_boosting(MODEFL, Ensemble);
+            
+            case 27  % T (expgrad iters)
+                Ensemble.Boosting.T = max(1, round(nk_input('Boosting: Set expgrad T (iterations)',0,'i',Ensemble.Boosting.T)));
+                Ensemble = local_sanitize_boosting(MODEFL, Ensemble);
+            
+            case 28  % shareWeights
+                Ensemble.Boosting.shareWeights = ~Ensemble.Boosting.shareWeights;
+            case 29  % [Boosting|Reg] kernel mode
+                if strcmpi(MODEFL,'regression')
+                    opts = 'residual-cov|residual-corr|residual-lapl';
+                    map  = {'residual-cov','residual-corr','residual-lapl'};
+                    def  = find(strcmpi(map, Ensemble.Boosting.Kernel.regMode)); if isempty(def), def = 1; end
+                    idx  = nk_input('Boosting for regression: Select diversity kernel mode',0,'m',opts,1:3,def);
+                    Ensemble.Boosting.Kernel.regMode = map{idx};
+                end
+            
+            case 30  % [Boosting|Reg] diag mode
+                if strcmpi(MODEFL,'regression')
+                    opts = 'one|zero|keep';
+                    map  = {'one','zero','keep'};
+                    def  = find(strcmpi(map, Ensemble.Boosting.Kernel.diagMode)); if isempty(def), def = 1; end
+                    idx  = nk_input('Boosting for regression: Select kernel diagonal handling',0,'m',opts,1:3,def);
+                    Ensemble.Boosting.Kernel.diagMode = map{idx};
+                end
+            
+            case 31  % [Boosting|Reg] scaling
+                if strcmpi(MODEFL,'regression')
+                    opts = 'HHT (match ‖H''H‖_2)|unit (normalize to 1)';
+                    map  = {'HHT','unit'};
+                    def  = find(strcmpi(map, Ensemble.Boosting.Kernel.scaleTo)); if isempty(def), def = 1; end
+                    idx  = nk_input('Boosting for regression: Select kernel scaling',0,'m',opts,1:2,def);
+                    Ensemble.Boosting.Kernel.scaleTo = map{idx};
+                end
+            
+            case 32  % [Boosting|Reg] auto-alpha / tau
+                if strcmpi(MODEFL,'regression')
+                    cur = Ensemble.Boosting.Kernel;
+                    prompt = sprintf(['[Boosting|Reg] Set target fraction τ (0..0.5)\n' ...
+                                      '  τ=0  → auto-alpha OFF\n' ...
+                                      '  τ>0  → auto-alpha ON (alpha set to match tau)\n' ...
+                                      'Current: τ=%.3g, auto-alpha=%s'], ...
+                                      cur.tau, onoff(cur.autoAlpha));
+                    tau = nk_input(prompt, 0, 'e', cur.tau);
+                    tau = max(0, min(0.5, tau));
+                    Ensemble.Boosting.Kernel.tau = tau;
+                    Ensemble.Boosting.Kernel.autoAlpha = (tau > 0);
+                end
     end
 end
 
@@ -353,6 +515,8 @@ switch Ensemble.ConstructMode
         end
     case 4
         Ensemble.type = 9; % PFC
+    case 5
+        Ensemble.type = 10; % Boosting framework
 end
 
 param.SubSpaceStrategy  = SubSpaceStrategy;
@@ -378,6 +542,29 @@ function Eout = local_overwrite_defaults(Def, In, MODEFL_)
     if ~isfield(Eout,'SizePenalty')     || isempty(Eout.SizePenalty),     Eout.SizePenalty     = 0.0; end
     if ~isfield(Eout,'Patience')        || isempty(Eout.Patience),        Eout.Patience        = 0;   end
     if ~isfield(Eout,'DiversityEps') || isempty(Eout.DiversityEps), Eout.DiversityEps = 0.02; end
+
+    if ~isfield(Eout,'Boosting') || ~isstruct(Eout.Boosting)
+        Eout.Boosting = Def.Boosting;
+    else
+        % deep-merge Boosting fields
+        fb = fieldnames(Def.Boosting);
+        for bb = 1:numel(fb)
+            if ~isfield(Eout.Boosting, fb{bb}) || isempty(Eout.Boosting.(fb{bb}))
+                Eout.Boosting.(fb{bb}) = Def.Boosting.(fb{bb});
+            end
+        end
+        % deep-merge Boosting.Kernel
+        if ~isfield(Eout.Boosting,'Kernel') || ~isstruct(Eout.Boosting.Kernel)
+            Eout.Boosting.Kernel = Def.Boosting.Kernel;
+        else
+            fk = fieldnames(Def.Boosting.Kernel);
+            for kk = 1:numel(fk)
+                if ~isfield(Eout.Boosting.Kernel,fk{kk}) || isempty(Eout.Boosting.Kernel.(fk{kk}))
+                    Eout.Boosting.Kernel.(fk{kk}) = Def.Boosting.Kernel.(fk{kk});
+                end
+            end
+        end
+    end
 
 end
 
@@ -455,6 +642,45 @@ function [Opt1, Opt2] = local_build_inlines(compFunc, regMode)
     end
 end
 
+end
+
+function s = onoff(tf)
+    if tf, s='ON'; else, s='OFF'; end
+end
+
+function E = local_sanitize_boosting(MODEFL_, E)
+% Enforce compatible Boosting settings given task (classification/regression)
+
+b = E.Boosting;
+
+if ~strcmpi(MODEFL_,'classification')
+    % Regression: only ridge is meaningful
+    b.mode      = 'ridge';
+    b.useLogits = false;   % no concept in regression
+    % expgrad params irrelevant
+else
+    % Classification specifics
+    if strcmpi(b.mode,'ridge')
+        % fine for calibrated probs or scores; useLogits optional (often false)
+    elseif strcmpi(b.mode,'logloss')
+        % expects probabilities; useLogits should be false
+        b.useLogits = false;
+    elseif strcmpi(b.mode,'expgrad')
+        % expects margin-like scores; allow useLogits=true to convert probs
+        if b.eta <= 0, b.eta = 0.3; end
+        if b.T   <  1, b.T   = 200; end
+    else
+        b.mode = 'ridge';
+    end
+end
+
+% numeric hygiene
+b.lambda     = max(eps, b.lambda);
+b.alpha      = max(0, b.alpha);
+b.wThreshold = max(0, b.wThreshold);
+b.clip       = max(0, min(0.5, b.clip));
+
+E.Boosting = b;
 end
 
 function txt = local_regularizer_help(SVM, EnsStrat)

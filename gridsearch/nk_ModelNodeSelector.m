@@ -107,18 +107,7 @@ for curlabel=1:nl
                 end
             else
                 GD.BinaryGridSelection{curclass}{curlabel} = BinaryGridSelection;
-%                 if isfield(GRD,'NodeSelect')  && GRD.NodeSelect.mode == 3
-%                     TransNodeArray = nk_CatNodes(BinaryGridSelection.bestCV1TsPred,curclass);
-%                     [ix,jx] = size(TransNodeArray);
-%                     % Loop through TransNodeArray (CV1 partitions)
-%                     for ti = 1 : ix
-%                         for tj = 1 : jx
-% 
-%                         end
-%                     end
-%                 end
             end
-
         end
 
         if nPerc > 1

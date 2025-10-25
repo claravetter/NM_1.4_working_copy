@@ -52,6 +52,11 @@ switch SVM.prog
     case 'MLPERC'
         algostr = 'Multi-layer perceptron [ probability ]';
         probflag = true;
+
+    case 'BAYLIN'
+        algostr = 'Bayesian ridge [ probability ]';
+        probflag = true;
+
     case 'TFDEEP'
         algostr = 'Tensorflow neural [ probability ]';
         probflag = true;

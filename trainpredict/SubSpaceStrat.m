@@ -142,16 +142,26 @@ for i=1:IN.nperms % loop through CV1 permutations
                                'useLogits',false, ...
                                'wThreshold',0, ...
                                'clip',1e-7);
-                    if isfield(Param,'Boosting')
-                        fn = fieldnames(Param.Boosting);
-                        for ff = 1:numel(fn), B.(fn{ff}) = Param.Boosting.(fn{ff}); end
+                    if isfield(Param.EnsembleStrategy,'Boosting')
+                        fn = fieldnames(Param.EnsembleStrategy.Boosting);
+                        for ff = 1:numel(fn), B.(fn{ff}) = Param.EnsembleStrategy.Boosting.(fn{ff}); end
                     end
                 
                     fixmask = @(ndim,F) (isempty(F) || numel(F)~=ndim) .* true(ndim,1) + ...
                                         (numel(F)==ndim) .* logical(F(:));
                 
                     for curclass = 1:IN.nclass
-                
+                        
+                         %% Get pointers and labels
+                        TrInd                   = IN.Y.TrInd{i,j}{curclass};
+                        CVInd                   = IN.Y.CVInd{i,j}{curclass};
+    
+                        %% Construct dichotomization labels for CV1 training and test data:
+                        CVL{curclass}           = zeros(size(OUT.CVtargs{i,j,curclass},1),1); 
+                        CVL{curclass}(CVInd)    = IN.Y.CVL{i,j}{curclass}(:,MULTILABEL.curdim);
+                        TrL{curclass}           = zeros(size(OUT.Trtargs{i,j,curclass},1),1); 
+                        TrL{curclass}(TrInd)    = IN.Y.TrL{i,j}{curclass}(:,MULTILABEL.curdim);
+
                         % --- mask and dimensions
                         if nc > 1
                             kInd = OUT.F{i,j,curclass};
@@ -237,11 +247,15 @@ for i=1:IN.nperms % loop through CV1 permutations
                         % Choose the appropriate representation for P:
                         %  - classification entropy/kappa/Q/LoBag: P_hard (N x m) of hard votes/correctness
                         %  - regression regvar: P_cont (N x m) of continuous predictions
-                        DivKern = nk_BuildDiversityKernel(Px, labelsForController, Ensemble.DiversitySource);
+                        if B.alpha>0 
+                            if strcmpi(MODEFL, 'regression')
+                                B.R = nk_BuildDiversityKernel(Px, labelsForController, Param.EnsembleStrategy.DiversitySource, B.Kernel); 
+                            else
+                                B.R = nk_BuildDiversityKernel(Px, labelsForController, Param.EnsembleStrategy.DiversitySource); 
+                            end
+                        end
+                        w = nk_EnsembleBoostingWeights(Px, labelsForController, B);
 
-                        % --- call controller
-                        w = nk_EnsembleBoostingWeights(Px, labelsForController, B, 'R', DivKern, 'metric', Metric);
-                
                         % --- optional sparsification
                         if B.wThreshold > 0
                             w(w < B.wThreshold) = 0;
@@ -250,27 +264,39 @@ for i=1:IN.nperms % loop through CV1 permutations
                 
                         % --- write back weights (full-length aligned to all learners)
                         wfull = zeros(ndim,1); wfull(cols) = w;
-                        OUT.Weights{i,j,curclass} = wfull;
-                        OUT.F{i,j,curclass}       = false(ndim,1); OUT.F{i,j,curclass}(cols) = true;
-                
+                        
                         % --- combine predictions (single column)
                         switch Metric
                             case 2
-                                trComb = OUT.Trdecs{i,j,curclass}(:,cols) * w;
-                                cvComb = OUT.CVdecs{i,j,curclass}(:,cols) * w;
+                                trComb = OUT.Trdecs{i,j,curclass}(:,cols) .* w';
+                                cvComb = OUT.CVdecs{i,j,curclass}(:,cols) .* w';
+                                
                                 OUT.TrHD{i,j,curclass} = trComb;
                                 OUT.CVHD{i,j,curclass} = cvComb;
                                 OUT.TrHT{i,j,curclass} = OUT.Trtargs{i,j,curclass};
                                 OUT.CVHT{i,j,curclass} = OUT.CVtargs{i,j,curclass};
                             otherwise
-                                trComb = OUT.Trtargs{i,j,curclass}(:,cols) * w;
-                                cvComb = OUT.CVtargs{i,j,curclass}(:,cols) * w;
+                                trComb = OUT.Trtargs{i,j,curclass}(:,cols) .* w';
+                                cvComb = OUT.CVtargs{i,j,curclass}(:,cols) .* w';
                                 OUT.TrHT{i,j,curclass} = trComb;
                                 OUT.CVHT{i,j,curclass} = cvComb;
                                 OUT.TrHD{i,j,curclass} = OUT.Trdecs{i,j,curclass};
                                 OUT.CVHD{i,j,curclass} = OUT.CVdecs{i,j,curclass};
                         end
-                
+                        kIndN = wfull>0;
+                        tSubSpaces{i,j,curclass}    = IN.F{i,j,curclass}(:,kIndN);
+                        tF{i,j,curclass}            = kIndN; 
+                        tWeights{i,j,curclass}      = wfull(kIndN);
+                        tModels{i,j,curclass}       = OUT.mdl{i,j,curclass}(kIndN);
+                        OUT.CVHD{i,j,curclass}      = OUT.CVHD{i,j,curclass}(:,kIndN); 
+                        OUT.CVHT{i,j,curclass}      = OUT.CVHT{i,j,curclass}(:,kIndN);
+                        OUT.TrHD{i,j,curclass}      = OUT.TrHD{i,j,curclass}(:,kIndN); 
+                        OUT.TrHT{i,j,curclass}      = OUT.TrHT{i,j,curclass}(:,kIndN);
+                        if W2AVAIL
+                            tW2{i,j,curclass}       = OUT.w2{i,j,curclass}(kIndN);
+                            tMd{i,j,curclass}       = OUT.Md{i,j,curclass}(kIndN);
+                            tMm{i,j,curclass}       = OUT.Mm{i,j,curclass}(kIndN);
+                        end                
                         % --- perf & diversity (assuming your helpers accept vector/matrix)
                         OUT.TrHDperf(i,j,curclass) = nk_EnsPerf( OUT.TrHD{i,j,curclass}, TrL{curclass} );
                         OUT.TrHTperf(i,j,curclass) = nk_EnsPerf( OUT.TrHT{i,j,curclass}, TrL{curclass} );
@@ -287,8 +313,6 @@ for i=1:IN.nperms % loop through CV1 permutations
                         OUT.mCVPerf(i,j) = OUT.mts{i,j};
                     end
 
-
-                
             otherwise
 
                 for curclass = 1: IN.nclass
@@ -687,7 +711,7 @@ for i=1:IN.nperms % loop through CV1 permutations
     end
 end
 
-if EnsType ~=9
+if EnsType ~=9 
     % Update IN and OUT
     IN.F        = tSubSpaces;
     OUT.F       = tF;

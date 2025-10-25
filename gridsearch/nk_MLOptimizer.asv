@@ -857,11 +857,8 @@ for f=1:ix % Loop through CV2 permutations
                             GDanalysis.multi_bestTR(f,d,curlabel) = nm_nanmean(GD.MultiGroupGridSelection{curlabel}.bestacc);
                             GDanalysis.multi_bestTS(f,d,curlabel) = nm_nanmean(GD.MultiGroupGridSelection{curlabel}.besttestparam);
                             % Store multi-group grid position
-                            if iscell(GDanalysis.multi_bestPpos)
+                            if iscell()
                                 GDanalysis.multi_bestPpos{ll,curlabel} = GD.MultiGroupGridSelection{curlabel}.Npos;
-                            else
-                                GDanalysis.multi_bestPpos(ll,curlabel) = GD.MultiGroupGridSelection{curlabel}.Npos;
-                            end
                             % Select from multi-group prediction grid   
                             for zu=1:GD.MultiGroupGridSelection{curlabel}.Nodes
                                 MultiPred = [MultiPred GD.MultiGroupGridSelection{curlabel}.bestpred{zu}];

@@ -59,6 +59,7 @@ switch MODEFL
 
         % sigmoid -> probability of class 1
         ds = 1 ./ (1 + exp(-ylin));
+        ds=ylin;
         rs = double(ds >= 0.5);                  % hard labels {0,1}
 
     case 'regression'

@@ -412,6 +412,8 @@ for k=1:iy % Loop through CV1 permutations
             if ~isempty(W) && ~isempty(W{k,l,curclass}) 
                 if nW == 1 , Wkl = W{k,l}';  else, Wkl = W{k,l,curclass}'; end
                 wx = repmat(Wkl,n_subj,1); tsD = bsxfun(@times,tsD,wx); tsT = bsxfun(@times,tsT,wx); 
+                idx_null = ~any(tsD); 
+                tsD(:,idx_null)=NaN; tsT(:,idx_null) = NaN;
             end
             
             % Compute binary performance on CV2 test data for current CV1 partition
@@ -423,9 +425,9 @@ for k=1:iy % Loop through CV1 permutations
             
             switch RAND.Decompose
                 case 9
-                    perf = zeros(ul,mnclass);
+                    perf = nan(ul,mnclass);
                 otherwise
-                    perf = zeros(ul,1);
+                    perf = nan(ul,1);
             end
             
             for u=1:ul
@@ -440,6 +442,7 @@ for k=1:iy % Loop through CV1 permutations
                         else
                             tsL = dTSLabel{curclass}(:,MULTILABEL.curdim);
                         end
+                        if ~nnz(isfinite(dtsD(:,u,v))),continue; end
                         perf(u,v) = EVALFUNC(tsL, dtsD(:,u,v)-offs);
                     end
                 end

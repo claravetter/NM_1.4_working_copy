@@ -123,6 +123,9 @@ switch SVM.prog
     case 'MLPERC'
         SVM.RVMflag = true;
 
+    case 'BAYLIN'
+        SVM.RVMflag = true;
+
     case 'TFDEEP'
         SVM.RVMflag = true;
 

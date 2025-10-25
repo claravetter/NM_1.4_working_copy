@@ -17,7 +17,17 @@ if iscell(P)
            GridSelectorResults.bestP{curclass}= P{curclass}(ipos,:);
         end
     else
+       if iscell(P{1})
+           for curclass=1:numel(P)
+               try
+                GridSelectorResults.bestP{curclass}= P{curclass}(ipos,:);
+               catch
+                   fprintf('problem')
+               end
+           end
+       else
         GridSelectorResults.bestP = P(ipos,:);
+       end
     end
 else
     GridSelectorResults.bestP = P(ipos,:);

@@ -96,7 +96,8 @@ elseif size(Y, 2) == 1
     model = model.fit(py.numpy.array(Y).reshape(int64(-1), int64(1)), double(label'));
 elseif size(Y, 1) == 1
     model = model.fit(py.numpy.array(Y).reshape(int64(1), int64(-1)), double(label'));
-else 
+else
+    model = model.fit(double(Y), double(label'));
 end
 
 

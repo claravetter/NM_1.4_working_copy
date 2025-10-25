@@ -41,7 +41,7 @@ switch SVM.prog
         xV = w(offs:end);  
     case 'GLMNET'
         xV = MD.beta;
-    case {'RNDFOR', 'GRDBST', 'MLPERC', 'TFDEEP'}
+    case {'RNDFOR', 'GRDBST', 'MLPERC', 'TFDEEP', 'BAYLIN'}
         %xV = MD.feature_importances_ %This gets the Gini importance of
         %features, but it isn't compatible with SVM weights since they
         %don't mean the same. 

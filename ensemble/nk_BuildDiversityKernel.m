@@ -1,45 +1,53 @@
-function R = nk_BuildDiversityKernel(P, L, src, varargin)
-% P: N x M predictions of M base learners
-%    - for CLASSIFICATION sources: supply *hard labels per learner* (e.g., argmax or sign)
-%    - for 'regvar' (REGRESSION): supply continuous predictions
-% L: N x 1 labels (class ids / {-1,+1} / continuous), aligned to P rows
-% src: same strings you already use in nm_diversity_score ('entropy','kappaa','kappaq','kappaf','lobag','regvar')
-% task: 'classification' | 'regression'
-% varargin: optional masks (logical Nx1) to select fitting rows, etc.
+function R = nk_BuildDiversityKernel(P, L, src, opts)
+% P : N×M predictions per learner (continuous for regression; hard votes for cls metrics)
+% L : N×1 labels/targets (continuous for regression)
+% src: 'entropy'|'kappaa'|'kappaq'|'kappaf'|'lobag'|'regvar'
+% opts (optional): struct with fields for regression kernels:
+%   .regMode  = 'residual-cov' | 'residual-corr' | 'residual-lapl'  (default 'residual-cov')
+%   .diagMode = 'one'|'zero'|'keep'                                    (default 'one')
+%   .scaleTo  = 'HHT'|'unit'                                           (default 'HHT')
 
-[~, M] = size(P);
-R = zeros(M, M);
+if nargin < 4 || isempty(opts), opts = struct; end
+if ~isfield(opts,'regMode'),  opts.regMode  = 'residual-cov'; end
+if ~isfield(opts,'diagMode'), opts.diagMode = 'one';          end
+if ~isfield(opts,'scaleTo'),  opts.scaleTo  = 'HHT';          end
 
-% (1) Pairwise build via your nm_diversity_score on {a,b}
-for a = 1:M
-  for b = a:M
-    if a==b
-      % Diagonal: self-diversity — set to agreement=1 (penalize redundancy) or 0.
-      % Using 1 makes w'Rw discourage weight concentration even with one learner.
-      R(a,a) = 1;
-    else
-      % Build 2-column subset and call your helper
-      Dpair = nm_diversity_score(P(:,[a b]), L, src);
-      % Your helper returns "higher = better (more diversity)" for all cases.
-      % For a *penalty* kernel, larger entries should mean "more redundancy".
-      % Therefore invert/monotone-map to a redundancy-like weight:
-      %   redundancy = 1 - normalized_diversity
-      % Most of your D are already in [0,1] after their mappings.
-      redundancy = 1 - max(0, min(1, Dpair));
-      R(a,b) = redundancy;
-      R(b,a) = redundancy;
+[~,M] = size(P);
+
+if strcmpi(src,'regvar')
+    % -------- Regression: build kernel in one shot via nk_RegAmbig --------
+    % P are continuous predictions; L is continuous target
+    R = nk_RegAmbig(P, L, opts.regMode, [], 'kernel', opts.diagMode);  % M×M PSD
+else
+    % -------- Classification-like sources: pairwise diversity → redundancy --------
+    R = zeros(M,M);
+    for a = 1:M
+        for b = a:M
+            if a==b
+                R(a,a) = 1;                               % self-redundancy baseline
+            else
+                Dpair = nm_diversity_score(P(:,[a b]), L, src);  % higher = more diverse
+                redund = 1 - max(0, min(1, Dpair));       % map to redundancy in [0,1]
+                R(a,b) = redund; R(b,a) = redund;
+            end
+        end
     end
-  end
+
+    % If your cls metrics expect hard labels, ensure P were hard-votes upstream.
 end
 
-% (2) 'regvar' requires continuous predictions; others need hard labels:
-% If caller passed soft probs/logits for classification, convert to hard votes before calling this function.
-%   e.g., P = (Pprob > 0.5); or P = onehot2argmax(PprobK); done upstream.
-
-% (3) Symmetrize, PSD-project, and scale so alpha is interpretable
+% -------- Symmetrize, PSD-project (safety) --------
 R = (R + R.')/2;
-[V,D] = eig(R); D = diag(D); D = max(D, 0); R = V*diag(D)*V';
-s = norm(R, 2); if s>0, R = R / s; end
+[V,D] = eig(R); d = max(diag(D),0); R = V*diag(d)*V.';
+
+% -------- Scale so alpha is interpretable --------
+switch lower(opts.scaleTo)
+    case 'unit'
+        sR = norm(R,2); if sR>0, R = R/sR; end
+    otherwise % 'HHT': match curvature to H'H
+        sH = norm(P.'*P, 2); sR = norm(R, 2);
+        if sR > 0, R = R * (sH / sR); end
+end
 end
 
 function D = nm_diversity_score(Psub, Lsub, src)
@@ -70,8 +78,6 @@ function D = nm_diversity_score(Psub, Lsub, src)
             else
                 D = -nk_Lobag(Psub, Lsub);
             end
-        case 'regvar'     % regression ambiguity (var around ensemble)
-            D = nk_RegAmbig(Psub, Lsub);
         otherwise
             D = nk_Entropy(Psub, [], [], []);
     end
